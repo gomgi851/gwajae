@@ -18,10 +18,19 @@ export async function fetchAllowedUsers() {
     return { data: [], error: null }
   }
 
-  return supabase
-    .from('allowed_users')
-    .select('id,email,role,active,created_at')
-    .order('created_at', { ascending: true })
+  const { data, error } = await supabase.rpc('get_admin_allowed_users_with_usage')
+
+  if (error) {
+    return supabase
+      .from('allowed_users')
+      .select('id,email,role,active,created_at')
+      .order('created_at', { ascending: true })
+  }
+
+  return {
+    data: (data ?? []) as AllowedUser[],
+    error: null,
+  }
 }
 
 export async function inviteAllowedUser(email: string, role: Role = 'member') {
@@ -54,4 +63,12 @@ export async function updateAllowedUser(
     .eq('id', id)
     .select('id,email,role,active,created_at')
     .single<AllowedUser>()
+}
+
+export async function deleteAllowedUser(id: string) {
+  if (!supabase) {
+    return { error: null }
+  }
+
+  return supabase.from('allowed_users').delete().eq('id', id)
 }

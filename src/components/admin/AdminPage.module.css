@@ -258,6 +258,59 @@
   font-weight: 700;
 }
 
+.deleteButton {
+  margin-left: 0.75rem;
+  border: none;
+  background: transparent;
+  color: #b15d5d;
+  font: inherit;
+  font-weight: 700;
+}
+
+.usageCell {
+  display: grid;
+  gap: 0.38rem;
+  min-width: 10rem;
+}
+
+.usageMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.usageText,
+.usagePercent {
+  color: #6d8498;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.usageTrack {
+  overflow: hidden;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: #e7ebef;
+}
+
+.usageFill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.usageNormal {
+  background: #8fb8d0;
+}
+
+.usageWarning {
+  background: #e1b54a;
+}
+
+.usageDanger {
+  background: #d46d6d;
+}
+
 @media (max-width: 760px) {
   .page {
     padding-inline: 1rem;

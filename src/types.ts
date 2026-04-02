@@ -41,6 +41,8 @@ export interface AllowedUser {
   role: Role
   active: boolean
   created_at?: string
+  usageBytes?: number
+  usageLimitBytes?: number
 }
 
 export interface StorageUsageSummary {

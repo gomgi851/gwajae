@@ -2,12 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useStorageUsage } from '../../hooks/useStorageUsage'
-import { fetchAllowedUsers, inviteAllowedUser, updateAllowedUser } from '../../lib/allowedUsers'
+import {
+  deleteAllowedUser,
+  fetchAllowedUsers,
+  inviteAllowedUser,
+  updateAllowedUser,
+} from '../../lib/allowedUsers'
 import type { AllowedUser } from '../../types'
 import { TopTabs } from '../common/TopTabs'
 import styles from './AdminPage.module.css'
 
 const adminTabs = [{ label: '관리자', to: '/admin' }]
+const USER_STORAGE_LIMIT_BYTES = 100 * 1024 * 1024
+const SUPER_ADMIN_EMAIL = 'yoonggee95@gmail.com'
 
 function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
   const percentage = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0
@@ -30,6 +37,39 @@ function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: numb
   )
 }
 
+function bytesToMegabytes(bytes: number) {
+  return Math.round((bytes / (1024 * 1024)) * 10) / 10
+}
+
+function UserStorageCell({ entry }: { entry: AllowedUser }) {
+  const usageBytes = entry.usageBytes ?? 0
+  const limitBytes = entry.usageLimitBytes ?? USER_STORAGE_LIMIT_BYTES
+  const usageMb = bytesToMegabytes(usageBytes)
+  const limitMb = bytesToMegabytes(limitBytes)
+  const percentage = limitBytes > 0 ? Math.min(100, Math.round((usageBytes / limitBytes) * 100)) : 0
+
+  const toneClass =
+    usageMb >= 95
+      ? styles.usageDanger
+      : usageMb >= 80
+        ? styles.usageWarning
+        : styles.usageNormal
+
+  return (
+    <div className={styles.usageCell}>
+      <div className={styles.usageMetaRow}>
+        <span className={styles.usageText}>
+          {usageMb}MB / {limitMb}MB
+        </span>
+        <span className={styles.usagePercent}>{percentage}%</span>
+      </div>
+      <div className={styles.usageTrack} aria-hidden="true">
+        <div className={`${styles.usageFill} ${toneClass}`} style={{ width: `${percentage}%` }} />
+      </div>
+    </div>
+  )
+}
+
 export function AdminPage() {
   const { user, signOut } = useAuth()
   const { totalUsedMb, totalLimitMb, error: storageError } = useStorageUsage()
@@ -40,6 +80,7 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null)
 
   const currentEmail = user?.email?.toLowerCase() ?? ''
+  const isSuperAdmin = currentEmail === SUPER_ADMIN_EMAIL
 
   async function loadAllowedUsers(options?: { keepLoadingState?: boolean }) {
     if (!options?.keepLoadingState) {
@@ -98,7 +139,7 @@ export function AdminPage() {
 
   async function toggleRole(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 관리자 계정의 권한은 여기서 바꿀 수 없습니다.')
+      setError('현재 로그인한 관리자 계정의 권한은 여기서 변경할 수 없습니다.')
       return
     }
 
@@ -141,6 +182,32 @@ export function AdminPage() {
     await loadAllowedUsers()
   }
 
+  async function handleDelete(entry: AllowedUser) {
+    if (!isSuperAdmin) {
+      setError('사용자 삭제는 메인 관리자 계정에서만 할 수 있습니다.')
+      return
+    }
+
+    if (entry.email === currentEmail) {
+      setError('현재 로그인한 메인 관리자 계정은 삭제할 수 없습니다.')
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+
+    const { error: deleteError } = await deleteAllowedUser(entry.id)
+
+    if (deleteError) {
+      setError(deleteError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setIsSaving(false)
+    await loadAllowedUsers()
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -170,7 +237,7 @@ export function AdminPage() {
               <input
                 className={styles.input}
                 type="email"
-                placeholder="허용할 구글 이메일을 입력해 주세요"
+                placeholder="허용할 구글 이메일을 입력해 주세요."
                 aria-label="초대할 사용자 이메일"
                 value={inviteEmail}
                 onChange={(event) => setInviteEmail(event.target.value)}
@@ -189,7 +256,7 @@ export function AdminPage() {
           {error ? <p className={styles.errorText}>{error}</p> : null}
           {storageError ? (
             <p className={styles.helperText}>
-              이 저장공간 수치는 데이터베이스가 아니라, 사용자가 올린 첨부파일 총합 기준입니다.
+              이 사용량은 데이터베이스가 아니라 사용자가 올린 첨부 파일 기준으로 계산됩니다.
             </p>
           ) : null}
           {isLoading ? <p className={styles.helperText}>허용 사용자 목록을 불러오는 중입니다...</p> : null}
@@ -201,6 +268,7 @@ export function AdminPage() {
                   <th>이메일</th>
                   <th>권한</th>
                   <th>상태</th>
+                  <th>사용량</th>
                   <th />
                 </tr>
               </thead>
@@ -232,6 +300,9 @@ export function AdminPage() {
                       </button>
                     </td>
                     <td>
+                      <UserStorageCell entry={entry} />
+                    </td>
+                    <td>
                       <button
                         className={styles.editButton}
                         type="button"
@@ -240,6 +311,16 @@ export function AdminPage() {
                       >
                         {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
                       </button>
+                      {isSuperAdmin ? (
+                        <button
+                          className={styles.deleteButton}
+                          type="button"
+                          onClick={() => void handleDelete(entry)}
+                          disabled={isSaving || entry.email === currentEmail}
+                        >
+                          사용자 삭제
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

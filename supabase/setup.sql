@@ -50,6 +50,23 @@ as $$
   )
 $$;
 
+create or replace function public.is_super_admin_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.allowed_users
+    where email = public.current_auth_email()
+      and role = 'admin'
+      and active = true
+      and email = 'yoonggee95@gmail.com'
+  )
+$$;
+
 alter table public.allowed_users enable row level security;
 
 drop policy if exists "allowed_users_select_self_or_admin" on public.allowed_users;
@@ -76,6 +93,13 @@ for update
 to authenticated
 using (public.is_admin_user())
 with check (public.is_admin_user());
+
+drop policy if exists "allowed_users_delete_super_admin" on public.allowed_users;
+create policy "allowed_users_delete_super_admin"
+on public.allowed_users
+for delete
+to authenticated
+using (public.is_super_admin_user());
 
 insert into public.allowed_users (email, role, active)
 values ('yoonggee95@gmail.com', 'admin', true)
@@ -409,3 +433,38 @@ as $$
 $$;
 
 grant execute on function public.get_storage_usage_summary() to authenticated;
+
+create or replace function public.get_admin_allowed_users_with_usage()
+returns table (
+  id uuid,
+  email text,
+  role text,
+  active boolean,
+  created_at timestamptz,
+  usage_bytes bigint,
+  usage_limit_bytes bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    au.id,
+    au.email,
+    au.role,
+    au.active,
+    au.created_at,
+    coalesce(sum(aa.size_bytes), 0::bigint) as usage_bytes,
+    104857600::bigint as usage_limit_bytes
+  from public.allowed_users au
+  left join auth.users u
+    on lower(u.email::text) = au.email
+  left join public.assignment_assets aa
+    on aa.owner_user_id = u.id
+  where public.is_admin_user()
+  group by au.id, au.email, au.role, au.active, au.created_at
+  order by au.created_at asc
+$$;
+
+grant execute on function public.get_admin_allowed_users_with_usage() to authenticated;
