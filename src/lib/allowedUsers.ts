@@ -150,7 +150,25 @@ export async function deleteAllowedUser(id: string) {
     return { error: null }
   }
 
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const accessToken = session?.access_token
+
+  if (!accessToken) {
+    return {
+      data: null,
+      error: {
+        message: '현재 로그인 세션을 확인할 수 없습니다. 다시 로그인한 뒤 시도해 주세요.',
+      },
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('purge-user', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: {
       allowedUserId: id,
     },
