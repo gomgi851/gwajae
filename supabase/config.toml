@@ -1,0 +1,2 @@
+[functions.purge-user]
+verify_jwt = false
