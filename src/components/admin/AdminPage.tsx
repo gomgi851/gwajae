@@ -139,6 +139,11 @@ export function AdminPage() {
   }
 
   async function toggleRole(entry: AllowedUser) {
+    if (!isSuperAdmin) {
+      setError('권한 변경은 메인 관리자 계정에서만 할 수 있습니다.')
+      return
+    }
+
     if (entry.email === currentEmail) {
       setError('현재 로그인한 관리자 계정의 권한은 여기서 바꿀 수 없습니다.')
       return
@@ -291,7 +296,7 @@ export function AdminPage() {
                         }
                         type="button"
                         onClick={() => void toggleRole(entry)}
-                        disabled={isSaving || entry.email === currentEmail}
+                        disabled={isSaving || entry.email === currentEmail || !isSuperAdmin}
                       >
                         {entry.role === 'admin' ? '관리자' : '일반'}
                       </button>
@@ -316,7 +321,7 @@ export function AdminPage() {
                           className={styles.actionButton}
                           type="button"
                           onClick={() => void toggleRole(entry)}
-                          disabled={isSaving || entry.email === currentEmail}
+                          disabled={isSaving || entry.email === currentEmail || !isSuperAdmin}
                         >
                           {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
                         </button>

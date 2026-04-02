@@ -10,6 +10,21 @@ begin
 end;
 $$;
 
+create or replace function public.guard_allowed_user_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.role is distinct from new.role and not public.is_super_admin_user() then
+    raise exception 'only super admin can change user roles';
+  end if;
+
+  return new;
+end;
+$$;
+
 create or replace function public.current_auth_email()
 returns text
 language sql
@@ -37,6 +52,12 @@ create trigger allowed_users_set_updated_at
 before update on public.allowed_users
 for each row
 execute function public.set_updated_at();
+
+drop trigger if exists allowed_users_guard_role_change on public.allowed_users;
+create trigger allowed_users_guard_role_change
+before update on public.allowed_users
+for each row
+execute function public.guard_allowed_user_role_change();
 
 create or replace function public.is_admin_user()
 returns boolean
