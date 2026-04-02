@@ -16,6 +16,10 @@ const adminTabs = [{ label: '관리자', to: '/admin' }]
 const USER_STORAGE_LIMIT_BYTES = 100 * 1024 * 1024
 const SUPER_ADMIN_EMAIL = 'yoonggee95@gmail.com'
 
+function bytesToMegabytes(bytes: number) {
+  return Math.round((bytes / (1024 * 1024)) * 10) / 10
+}
+
 function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
   const percentage = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0
 
@@ -35,10 +39,6 @@ function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: numb
       </div>
     </section>
   )
-}
-
-function bytesToMegabytes(bytes: number) {
-  return Math.round((bytes / (1024 * 1024)) * 10) / 10
 }
 
 function UserStorageCell({ entry }: { entry: AllowedUser }) {
@@ -63,8 +63,8 @@ function UserStorageCell({ entry }: { entry: AllowedUser }) {
         </span>
         <span className={styles.usagePercent}>{percentage}%</span>
       </div>
-      <div className={styles.usageTrack} aria-hidden="true">
-        <div className={`${styles.usageFill} ${toneClass}`} style={{ width: `${percentage}%` }} />
+      <div className={styles.userUsageTrack} aria-hidden="true">
+        <div className={`${styles.userUsageFill} ${toneClass}`} style={{ width: `${percentage}%` }} />
       </div>
     </div>
   )
@@ -86,6 +86,7 @@ export function AdminPage() {
     if (!options?.keepLoadingState) {
       setIsLoading(true)
     }
+
     setError(null)
 
     const { data, error: queryError } = await fetchAllowedUsers()
@@ -111,7 +112,7 @@ export function AdminPage() {
     const normalizedEmail = inviteEmail.trim().toLowerCase()
 
     if (!normalizedEmail) {
-      setError('초대할 구글 이메일을 입력해 주세요.')
+      setError('허용할 구글 이메일을 입력해 주세요.')
       return
     }
 
@@ -139,7 +140,7 @@ export function AdminPage() {
 
   async function toggleRole(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 관리자 계정의 권한은 여기서 변경할 수 없습니다.')
+      setError('현재 로그인한 관리자 계정의 권한은 여기서 바꿀 수 없습니다.')
       return
     }
 
@@ -161,7 +162,7 @@ export function AdminPage() {
 
   async function toggleActive(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 계정은 여기서 비활성화할 수 없습니다.')
+      setError('현재 로그인한 계정은 비활성화할 수 없습니다.')
       return
     }
 
@@ -190,6 +191,11 @@ export function AdminPage() {
 
     if (entry.email === currentEmail) {
       setError('현재 로그인한 메인 관리자 계정은 삭제할 수 없습니다.')
+      return
+    }
+
+    const confirmed = window.confirm(`${entry.email} 계정을 허용 목록에서 삭제할까요?`)
+    if (!confirmed) {
       return
     }
 
@@ -256,7 +262,7 @@ export function AdminPage() {
           {error ? <p className={styles.errorText}>{error}</p> : null}
           {storageError ? (
             <p className={styles.helperText}>
-              이 사용량은 데이터베이스가 아니라 사용자가 올린 첨부 파일 기준으로 계산됩니다.
+              사용자별 사용량은 첨부 파일 크기 기준입니다. 최신 정책이 반영되지 않았다면 0MB로 보일 수 있습니다.
             </p>
           ) : null}
           {isLoading ? <p className={styles.helperText}>허용 사용자 목록을 불러오는 중입니다...</p> : null}
@@ -269,7 +275,7 @@ export function AdminPage() {
                   <th>권한</th>
                   <th>상태</th>
                   <th>사용량</th>
-                  <th />
+                  <th>관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -303,24 +309,26 @@ export function AdminPage() {
                       <UserStorageCell entry={entry} />
                     </td>
                     <td>
-                      <button
-                        className={styles.editButton}
-                        type="button"
-                        onClick={() => void toggleRole(entry)}
-                        disabled={isSaving || entry.email === currentEmail}
-                      >
-                        {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
-                      </button>
-                      {isSuperAdmin ? (
+                      <div className={styles.actionButtons}>
                         <button
-                          className={styles.deleteButton}
+                          className={styles.actionButton}
                           type="button"
-                          onClick={() => void handleDelete(entry)}
+                          onClick={() => void toggleRole(entry)}
                           disabled={isSaving || entry.email === currentEmail}
                         >
-                          사용자 삭제
+                          {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
                         </button>
-                      ) : null}
+                        {isSuperAdmin ? (
+                          <button
+                            className={styles.deleteButton}
+                            type="button"
+                            onClick={() => void handleDelete(entry)}
+                            disabled={isSaving || entry.email === currentEmail}
+                          >
+                            사용자 삭제
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}

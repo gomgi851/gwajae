@@ -459,7 +459,7 @@ as $$
     104857600::bigint as usage_limit_bytes
   from public.allowed_users au
   left join auth.users u
-    on lower(u.email::text) = au.email
+    on lower(coalesce(u.email::text, '')) = au.email
   left join public.assignment_assets aa
     on aa.owner_user_id = u.id
   where public.is_admin_user()

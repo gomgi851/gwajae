@@ -147,7 +147,8 @@
 .memberBadgeButton:disabled,
 .statusButtonActive:disabled,
 .statusButtonInactive:disabled,
-.editButton:disabled {
+.actionButton:disabled,
+.deleteButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -250,21 +251,33 @@
   background: #b9c6d1;
 }
 
-.editButton {
+.actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.actionButton,
+.deleteButton {
   border: none;
-  background: transparent;
-  color: #58718a;
+  border-radius: 999px;
+  padding: 0.45rem 0.82rem;
   font: inherit;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
+.actionButton {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(223, 231, 237, 0.95);
+  color: #58718a;
+}
+
 .deleteButton {
-  margin-left: 0.75rem;
-  border: none;
-  background: transparent;
-  color: #b15d5d;
-  font: inherit;
-  font-weight: 700;
+  background: #fcebeb;
+  color: #a74444;
+  box-shadow: inset 0 0 0 1px #f3caca;
 }
 
 .usageCell {
@@ -287,14 +300,14 @@
   font-weight: 700;
 }
 
-.usageTrack {
+.userUsageTrack {
   overflow: hidden;
   height: 0.38rem;
   border-radius: 999px;
   background: #e7ebef;
 }
 
-.usageFill {
+.userUsageFill {
   height: 100%;
   border-radius: inherit;
 }
