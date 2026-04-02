@@ -11,7 +11,31 @@ function bytesToMegabytes(bytes: number) {
   return Math.round((bytes / (1024 * 1024)) * 10) / 10
 }
 
-function UsageCard({ title, used, total, circular = false }: {
+function getDdayLabel(dueDate: string) {
+  const today = new Date()
+  const due = new Date(dueDate)
+
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate())
+  const diffDays = Math.round((dueStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) {
+    return 'D-day'
+  }
+
+  if (diffDays > 0) {
+    return `D-${diffDays}`
+  }
+
+  return `D+${Math.abs(diffDays)}`
+}
+
+function UsageCard({
+  title,
+  used,
+  total,
+  circular = false,
+}: {
   title: string
   used: number
   total: number
@@ -104,42 +128,58 @@ function DeadlineRow({
   onToggleSubmitted: (assignment: Assignment) => Promise<void>
 }) {
   return (
-    <li className={styles.listRow}>
-      <div className={styles.rowMeta}>
+    <li className={styles.assignmentRow}>
+      <div className={styles.subjectCell}>
         <span
           className={styles.subjectPill}
           style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
         >
           {assignment.subjectName ?? '미지정'}
         </span>
-        <div>
-          <p className={styles.assignmentName}>{assignment.title}</p>
-          <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
-        </div>
       </div>
-      <SubmittedToggle assignment={assignment} disabled={disabled} onToggle={onToggleSubmitted} />
+
+      <div className={styles.contentCell}>
+        <p className={styles.assignmentName}>{assignment.title}</p>
+        <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
+      </div>
+
+      <div className={styles.ddayCell}>
+        <span className={styles.ddayBadge}>{getDdayLabel(assignment.dueDate)}</span>
+      </div>
+
+      <div className={styles.actionCell}>
+        <SubmittedToggle assignment={assignment} disabled={disabled} onToggle={onToggleSubmitted} />
+      </div>
     </li>
   )
 }
 
 function FavoriteRow({ assignment }: { assignment: Assignment }) {
   return (
-    <li className={styles.listRow}>
-      <div className={styles.rowMeta}>
+    <li className={styles.assignmentRow}>
+      <div className={styles.subjectCell}>
         <span
           className={styles.subjectPill}
           style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
         >
           {assignment.subjectName ?? '미지정'}
         </span>
-        <div>
-          <p className={styles.assignmentName}>{assignment.title}</p>
-          <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
-        </div>
       </div>
-      <span className={`${styles.pinBadge} ${styles.pinBadgeActive}`} aria-label="고정된 과제">
-        <PinIcon />
-      </span>
+
+      <div className={styles.contentCell}>
+        <p className={styles.assignmentName}>{assignment.title}</p>
+        <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
+      </div>
+
+      <div className={styles.ddayCell}>
+        <span className={styles.ddayBadge}>{getDdayLabel(assignment.dueDate)}</span>
+      </div>
+
+      <div className={styles.actionCell}>
+        <span className={`${styles.pinBadge} ${styles.pinBadgeActive}`} aria-label="고정한 과제">
+          <PinIcon />
+        </span>
+      </div>
     </li>
   )
 }
@@ -194,7 +234,16 @@ export function HomePage() {
       </div>
 
       <section className={`${styles.panel} ${styles.tallPanel}`}>
-        <h1 className={styles.panelTitle}>다가오는 마감</h1>
+        <div className={styles.panelHeader}>
+          <h1 className={styles.panelTitle}>다가오는 마감</h1>
+          <div className={styles.panelColumns} aria-hidden="true">
+            <span>과목</span>
+            <span>내용</span>
+            <span>D-day</span>
+            <span>제출</span>
+          </div>
+        </div>
+
         {isLoading ? <p className={styles.helperText}>과제 데이터를 불러오는 중입니다...</p> : null}
         {dataError ? <p className={styles.helperText}>{dataError}</p> : null}
         {!isLoading && !dataError ? (
@@ -209,7 +258,7 @@ export function HomePage() {
                 />
               ))
             ) : (
-              <li className={styles.listRow}>
+              <li className={styles.emptyRow}>
                 <p className={styles.assignmentDetail}>
                   아직 등록된 과제가 없습니다. 과제 관리 탭에서 첫 과제를 추가해 보세요.
                 </p>
@@ -220,7 +269,16 @@ export function HomePage() {
       </section>
 
       <section className={`${styles.panel} ${styles.bottomPanel}`}>
-        <h1 className={styles.panelTitle}>고정한 과제</h1>
+        <div className={styles.panelHeader}>
+          <h1 className={styles.panelTitle}>고정한 과제</h1>
+          <div className={styles.panelColumns} aria-hidden="true">
+            <span>과목</span>
+            <span>내용</span>
+            <span>D-day</span>
+            <span>고정</span>
+          </div>
+        </div>
+
         {!isLoading && !dataError ? (
           <ul className={styles.list}>
             {favoriteAssignments.length > 0 ? (
@@ -228,7 +286,7 @@ export function HomePage() {
                 <FavoriteRow key={assignment.id} assignment={assignment} />
               ))
             ) : (
-              <li className={styles.listRow}>
+              <li className={styles.emptyRow}>
                 <p className={styles.assignmentDetail}>
                   핀 버튼을 누른 과제가 이 카드의 맨 위에 고정되어 표시됩니다.
                 </p>

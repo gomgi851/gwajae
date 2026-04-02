@@ -1,17 +1,7 @@
 import { useMemo, useState } from 'react'
-import type { Assignment, Subject } from '../../types'
+import type { Assignment, AssignmentAsset, Subject } from '../../types'
+import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
-
-interface AssignmentFormInput {
-  subjectId: string
-  title: string
-  dueDate: string
-  submitted: boolean
-  description: string
-  externalLink: string
-  imageFiles: File[]
-  attachmentFiles: File[]
-}
 
 interface NewAssignmentModalProps {
   assignment?: Assignment | null
@@ -46,6 +36,13 @@ function toDateTimeLocalValue(value?: string) {
   return offsetDate.toISOString().slice(0, 16)
 }
 
+function splitAssets(assets: AssignmentAsset[] | undefined) {
+  return {
+    images: (assets ?? []).filter((asset) => asset.assetType === 'image'),
+    files: (assets ?? []).filter((asset) => asset.assetType === 'file'),
+  }
+}
+
 export function NewAssignmentModal({
   assignment,
   onClose,
@@ -64,8 +61,18 @@ export function NewAssignmentModal({
   const [submitted, setSubmitted] = useState(assignment?.submitted ?? false)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
+  const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const resolvedSubjectId = subjectId || subjects[0]?.id || ''
+  const { images: existingImages, files: existingFiles } = useMemo(
+    () => splitAssets(assignment?.assets),
+    [assignment?.assets],
+  )
+
+  const visibleExistingImages = existingImages.filter((asset) => !removedAssetIds.includes(asset.id))
+  const visibleExistingFiles = existingFiles.filter((asset) => !removedAssetIds.includes(asset.id))
 
   const selectedBytes = useMemo(
     () =>
@@ -75,7 +82,25 @@ export function NewAssignmentModal({
     [attachmentFiles, imageFiles],
   )
 
-  const resolvedSubjectId = subjectId || subjects[0]?.id || ''
+  const remainingAfterSelection = Math.max(0, remainingBytes - selectedBytes)
+
+  function addFiles(nextFiles: File[], setter: React.Dispatch<React.SetStateAction<File[]>>) {
+    setter((currentFiles) => [...currentFiles, ...nextFiles])
+  }
+
+  function removeNewImage(index: number) {
+    setImageFiles((currentFiles) => currentFiles.filter((_, currentIndex) => currentIndex !== index))
+  }
+
+  function removeNewAttachment(index: number) {
+    setAttachmentFiles((currentFiles) =>
+      currentFiles.filter((_, currentIndex) => currentIndex !== index),
+    )
+  }
+
+  function markExistingAssetRemoved(assetId: string) {
+    setRemovedAssetIds((currentIds) => [...new Set([...currentIds, assetId])])
+  }
 
   async function handleSubmit() {
     if (!title.trim() || !dueDate || !resolvedSubjectId) {
@@ -85,7 +110,7 @@ export function NewAssignmentModal({
 
     if (selectedBytes > remainingBytes) {
       setError(
-        `선택한 파일 용량이 남은 한도를 넘었습니다. 남은 용량은 ${bytesToMegabytes(remainingBytes)}MB입니다.`,
+        `선택한 파일 용량이 남은 저장공간을 초과했습니다. 남은 용량은 ${bytesToMegabytes(remainingBytes)}MB입니다.`,
       )
       return
     }
@@ -93,7 +118,7 @@ export function NewAssignmentModal({
     setIsSubmitting(true)
     setError(null)
 
-    const payload = {
+    const payload: AssignmentFormInput = {
       subjectId: resolvedSubjectId,
       title,
       dueDate: new Date(dueDate).toISOString(),
@@ -102,6 +127,7 @@ export function NewAssignmentModal({
       externalLink,
       imageFiles,
       attachmentFiles,
+      removedAssetIds,
     }
 
     const result = assignment
@@ -129,18 +155,25 @@ export function NewAssignmentModal({
         onClick={(event) => event.stopPropagation()}
       >
         <header className={styles.header}>
-          <h2 id="assignment-modal-title" className={styles.title}>
-            {isEditMode ? '과제 수정' : '새 과제 등록'}
-          </h2>
+          <div>
+            <h2 id="assignment-modal-title" className={styles.title}>
+              {isEditMode ? '과제 수정' : '새 과제 등록'}
+            </h2>
+            <p className={styles.subtitle}>
+              기본 정보와 첨부 파일을 한 번에 정리할 수 있어요.
+            </p>
+          </div>
           <button className={styles.closeButton} onClick={onClose} aria-label="모달 닫기">
             ×
           </button>
         </header>
 
         <div className={styles.body}>
-          <div className={styles.formColumn}>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>기본 정보</h3>
+
             <label className={styles.field}>
-              <span>과제명</span>
+              <span>과제명 *</span>
               <input
                 type="text"
                 placeholder="예: 발표 자료 정리"
@@ -151,7 +184,7 @@ export function NewAssignmentModal({
 
             <div className={styles.fieldRow}>
               <label className={styles.field}>
-                <span>과목</span>
+                <span>과목 *</span>
                 <select
                   value={resolvedSubjectId}
                   onChange={(event) => setSubjectId(event.target.value)}
@@ -165,7 +198,7 @@ export function NewAssignmentModal({
               </label>
 
               <label className={styles.field}>
-                <span>마감일시</span>
+                <span>마감일시 *</span>
                 <input
                   type="datetime-local"
                   value={dueDate}
@@ -193,42 +226,140 @@ export function NewAssignmentModal({
                 onChange={(event) => setExternalLink(event.target.value)}
               />
             </label>
-          </div>
+          </section>
 
-          <div className={styles.uploadColumn}>
-            <div className={styles.uploadField}>
-              <span>첨부 파일</span>
-              <div className={styles.dropzone}>
-                <p className={styles.helperText}>이미지와 일반 파일을 각각 여러 개 올릴 수 있습니다.</p>
-                <div className={styles.pickerGrid}>
-                  <label className={styles.filePickerLabel}>
-                    이미지 추가
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(event) => setImageFiles(Array.from(event.target.files ?? []))}
-                    />
-                  </label>
-                  <label className={styles.filePickerLabel}>
-                    파일 추가
-                    <input
-                      type="file"
-                      multiple
-                      onChange={(event) => setAttachmentFiles(Array.from(event.target.files ?? []))}
-                    />
-                  </label>
-                </div>
-                {assignment?.assets?.length ? (
-                  <p className={styles.fileSummary}>기존 첨부 {assignment.assets.length}개 유지됨</p>
-                ) : null}
-                <p className={styles.fileSummary}>
-                  새 이미지 {imageFiles.length}개, 새 파일 {attachmentFiles.length}개, 총{' '}
-                  {bytesToMegabytes(selectedBytes)}MB 선택됨
-                </p>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>첨부 관리</h3>
+
+            <div className={styles.attachmentPanel}>
+              <div className={styles.panelHeader}>
+                <span className={styles.panelTitle}>기존 첨부</span>
+                <span className={styles.panelMeta}>
+                  이미지 {visibleExistingImages.length}개 / 파일 {visibleExistingFiles.length}개
+                </span>
               </div>
+
+              {visibleExistingImages.length === 0 && visibleExistingFiles.length === 0 ? (
+                <p className={styles.emptyText}>아직 첨부된 파일이 없습니다.</p>
+              ) : (
+                <ul className={styles.assetList}>
+                  {visibleExistingImages.map((asset) => (
+                    <li key={asset.id} className={styles.assetItem}>
+                      <div className={styles.assetInfo}>
+                        <span className={styles.assetName}>{asset.fileName}</span>
+                        <span className={styles.assetMeta}>
+                          이미지 · {bytesToMegabytes(asset.sizeBytes)}MB
+                          {asset.isThumbnail ? ' · 썸네일' : ''}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.removeChip}
+                        onClick={() => markExistingAssetRemoved(asset.id)}
+                      >
+                        삭제
+                      </button>
+                    </li>
+                  ))}
+                  {visibleExistingFiles.map((asset) => (
+                    <li key={asset.id} className={styles.assetItem}>
+                      <div className={styles.assetInfo}>
+                        <span className={styles.assetName}>{asset.fileName}</span>
+                        <span className={styles.assetMeta}>
+                          파일 · {bytesToMegabytes(asset.sizeBytes)}MB
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.removeChip}
+                        onClick={() => markExistingAssetRemoved(asset.id)}
+                      >
+                        삭제
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
+            <div className={styles.attachmentPanel}>
+              <div className={styles.panelHeader}>
+                <span className={styles.panelTitle}>새 첨부 추가</span>
+                <span className={styles.panelMeta}>이번 저장 때 함께 업로드됩니다.</span>
+              </div>
+
+              <div className={styles.pickerRow}>
+                <label className={styles.filePickerLabel}>
+                  이미지 추가
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(event) =>
+                      addFiles(Array.from(event.target.files ?? []), setImageFiles)
+                    }
+                  />
+                </label>
+                <label className={styles.filePickerLabel}>
+                  파일 추가
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(event) =>
+                      addFiles(Array.from(event.target.files ?? []), setAttachmentFiles)
+                    }
+                  />
+                </label>
+              </div>
+
+              {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
+                <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
+              ) : (
+                <ul className={styles.assetList}>
+                  {imageFiles.map((file, index) => (
+                    <li key={`${file.name}-${index}`} className={styles.assetItem}>
+                      <div className={styles.assetInfo}>
+                        <span className={styles.assetName}>{file.name}</span>
+                        <span className={styles.assetMeta}>
+                          이미지 · {bytesToMegabytes(file.size)}MB
+                          {index === 0 ? ' · 첫 이미지가 썸네일' : ''}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.removeChip}
+                        onClick={() => removeNewImage(index)}
+                      >
+                        제거
+                      </button>
+                    </li>
+                  ))}
+
+                  {attachmentFiles.map((file, index) => (
+                    <li key={`${file.name}-${file.size}-${index}`} className={styles.assetItem}>
+                      <div className={styles.assetInfo}>
+                        <span className={styles.assetName}>{file.name}</span>
+                        <span className={styles.assetMeta}>
+                          파일 · {bytesToMegabytes(file.size)}MB
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.removeChip}
+                        onClick={() => removeNewAttachment(index)}
+                      >
+                        제거
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <footer className={styles.footer}>
+          <div className={styles.footerMeta}>
             <label className={styles.checkboxRow}>
               <input
                 type="checkbox"
@@ -237,20 +368,32 @@ export function NewAssignmentModal({
               />
               <span>제출 완료로 표시</span>
             </label>
-
-            <p className={styles.helperText}>남은 개인 저장공간 {bytesToMegabytes(remainingBytes)}MB</p>
+            <p className={styles.helperText}>
+              남은 개인 저장공간 {bytesToMegabytes(remainingAfterSelection)}MB
+            </p>
             {error ? <p className={styles.errorText}>{error}</p> : null}
+          </div>
 
+          <div className={styles.footerActions}>
+            <button className={styles.cancelButton} type="button" onClick={onClose}>
+              취소
+            </button>
             <button
               className={styles.submitButton}
               type="button"
               onClick={() => void handleSubmit()}
               disabled={isSubmitting}
             >
-              {isSubmitting ? (isEditMode ? '수정 중...' : '등록 중...') : isEditMode ? '과제 수정' : '과제 등록'}
+              {isSubmitting
+                ? isEditMode
+                  ? '수정 중...'
+                  : '등록 중...'
+                : isEditMode
+                  ? '저장하기'
+                  : '과제 등록'}
             </button>
           </div>
-        </div>
+        </footer>
       </section>
     </div>
   )
