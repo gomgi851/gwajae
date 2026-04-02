@@ -13,11 +13,13 @@ export function useStorageUsage() {
   const [summary, setSummary] = useState<StorageUsageSummary>(EMPTY_SUMMARY)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     let ignore = false
 
     async function run() {
+      setIsLoading(true)
       const { data, error: fetchError } = await fetchStorageUsageSummary()
 
       if (ignore) {
@@ -34,7 +36,7 @@ export function useStorageUsage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [refreshKey])
 
   return {
     summary,
@@ -44,5 +46,6 @@ export function useStorageUsage() {
     personalLimitMb: bytesToMegabytes(summary.personalLimitBytes),
     totalUsedMb: bytesToMegabytes(summary.totalBytes),
     totalLimitMb: bytesToMegabytes(summary.totalLimitBytes),
+    refresh: () => setRefreshKey((current) => current + 1),
   }
 }

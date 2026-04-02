@@ -10,7 +10,7 @@ interface TopTabsProps {
 
 export function TopTabs({ items }: TopTabsProps) {
   return (
-    <nav className={styles.tabs} aria-label="Primary">
+    <nav className={styles.tabs} aria-label="주요 탭">
       {items.map((item) => (
         <NavLink
           key={item.to}

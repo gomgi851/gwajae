@@ -32,10 +32,10 @@ export function LoginPage() {
     <div className={styles.page}>
       <section className={styles.card}>
         <span className={styles.badge}>Gwajae</span>
-        <h1 className={styles.title}>Private assignment space for your group</h1>
+        <h1 className={styles.title}>우리끼리 쓰는 과제 관리 공간</h1>
         <p className={styles.description}>
-          Sign in with Google. Only allowed accounts can enter, and admin accounts can
-          open the separate admin space.
+          구글 계정으로 로그인해서 과제와 첨부파일을 관리하세요. 허용된 이메일만 들어올 수 있고,
+          관리자 계정은 별도의 관리자 공간도 사용할 수 있습니다.
         </p>
 
         <div className={styles.actions}>
@@ -45,24 +45,27 @@ export function LoginPage() {
             onClick={() => void signInWithGoogle()}
             disabled={!isConfigured}
           >
-            Continue with Google
+            Google로 계속하기
           </button>
           {user ? (
             <button type="button" className={styles.secondaryButton} onClick={() => void signOut()}>
-              Sign out
+              로그아웃
             </button>
           ) : null}
         </div>
 
         <div className={styles.infoBox}>
-          <strong>Before this works</strong>
-          <p>Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and run `supabase/setup.sql`.</p>
+          <strong>처음 한 번만 필요해요</strong>
+          <p>
+            `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`를 설정하고
+            `supabase/setup.sql`을 실행하세요.
+          </p>
         </div>
 
         {isAuthenticated && !isAuthorized ? (
           <div className={styles.warningBox}>
-            <strong>This account is signed in but not allowed yet.</strong>
-            <p>{accessMessage ?? 'Ask an admin to add your email inside the admin panel.'}</p>
+            <strong>로그인은 되었지만 아직 허용되지 않은 계정입니다.</strong>
+            <p>{accessMessage ?? '관리자 페이지에서 이 이메일을 허용 목록에 추가해 주세요.'}</p>
           </div>
         ) : null}
       </section>

@@ -1,5 +1,12 @@
-import { useMemo, useState } from 'react'
-import { assignments as initialAssignments, subjects as initialSubjects } from '../../data/mockData'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  createAssignmentWithAssets,
+  deleteAssignment,
+  fetchAssignments,
+  updateAssignment,
+} from '../../lib/assignments'
+import { createSubject, ensureDefaultSubject, fetchSubjects } from '../../lib/subjects'
+import { useStorageUsage } from '../../hooks/useStorageUsage'
 import type { Assignment, Subject } from '../../types'
 import { NewAssignmentModal } from './NewAssignmentModal'
 import styles from './AssignmentsPage.module.css'
@@ -15,47 +22,63 @@ const pastelOptions = [
   '#d0daf5',
 ]
 
-function getSubject(subjectList: Subject[], subjectId: string) {
-  return subjectList.find((subject) => subject.id === subjectId)
-}
-
 function formatDueDate(isoDate: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: '2-digit',
+  return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
+    month: 'short',
+    day: 'numeric',
   }).format(new Date(isoDate))
 }
 
-function SubmittedToggle({ assignment }: { assignment: Assignment }) {
-  return assignment.submitted ? (
-    <span className={`${styles.statusCircle} ${styles.statusDone}`}>✓</span>
-  ) : (
-    <span className={styles.statusCircle} />
+function SubmittedToggle({
+  assignment,
+  onToggle,
+  disabled,
+}: {
+  assignment: Assignment
+  onToggle: (assignment: Assignment) => Promise<void>
+  disabled: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={styles.statusButton}
+      onClick={() => void onToggle(assignment)}
+      disabled={disabled}
+      aria-label={assignment.submitted ? '미제출로 변경' : '제출 완료로 변경'}
+    >
+      <span
+        className={
+          assignment.submitted ? `${styles.statusCircle} ${styles.statusDone}` : styles.statusCircle
+        }
+      >
+        {assignment.submitted ? 'v' : ''}
+      </span>
+    </button>
   )
 }
 
 interface NewSubjectModalProps {
   onClose: () => void
-  onCreate: (subject: Subject) => void
+  onCreate: (name: string, color: string) => Promise<void>
+  isSaving: boolean
 }
 
-function NewSubjectModal({ onClose, onCreate }: NewSubjectModalProps) {
+function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(pastelOptions[0])
+  const [error, setError] = useState<string | null>(null)
 
-  function handleCreate() {
+  async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) {
+      setError('과목명을 먼저 입력해 주세요.')
       return
     }
 
-    onCreate({
-      id: trimmed.toLowerCase().replace(/\s+/g, '-'),
-      name: trimmed,
-      color,
-    })
-    onClose()
+    setError(null)
+    await onCreate(trimmed, color)
+    setName('')
   }
 
   return (
@@ -69,41 +92,52 @@ function NewSubjectModal({ onClose, onCreate }: NewSubjectModalProps) {
       >
         <header className={styles.subjectModalHeader}>
           <h2 id="new-subject-title" className={styles.subjectModalTitle}>
-            New Subject
+            새 과목 추가
           </h2>
-          <button className={styles.closeButton} onClick={onClose} aria-label="Close subject modal">
-            ×
+          <button className={styles.closeButton} onClick={onClose} aria-label="과목 모달 닫기">
+            x
           </button>
         </header>
 
         <label className={styles.subjectField}>
-          <span>Subject name</span>
+          <span>과목명</span>
           <input
             type="text"
-            placeholder="e.g. Literature"
+            placeholder="예: 문학"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </label>
 
         <div className={styles.subjectField}>
-          <span>Pastel color</span>
+          <span>파스텔 색상</span>
           <div className={styles.colorGrid}>
             {pastelOptions.map((option) => (
               <button
                 key={option}
                 type="button"
-                className={option === color ? `${styles.colorSwatch} ${styles.colorSwatchActive}` : styles.colorSwatch}
+                className={
+                  option === color
+                    ? `${styles.colorSwatch} ${styles.colorSwatchActive}`
+                    : styles.colorSwatch
+                }
                 style={{ backgroundColor: option }}
                 onClick={() => setColor(option)}
-                aria-label={`Pick color ${option}`}
+                aria-label={`색상 ${option} 선택`}
               />
             ))}
           </div>
         </div>
 
-        <button className={styles.createSubjectButton} type="button" onClick={handleCreate}>
-          Add Subject
+        {error ? <p className={styles.errorText}>{error}</p> : null}
+
+        <button
+          className={styles.createSubjectButton}
+          type="button"
+          onClick={() => void handleCreate()}
+          disabled={isSaving}
+        >
+          과목 추가
         </button>
       </section>
     </div>
@@ -111,39 +145,146 @@ function NewSubjectModal({ onClose, onCreate }: NewSubjectModalProps) {
 }
 
 export function AssignmentsPage() {
+  const { summary, refresh: refreshUsage } = useStorageUsage()
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
   const [subjectFilter, setSubjectFilter] = useState('all')
-  const [subjectList, setSubjectList] = useState(initialSubjects)
+  const [subjectList, setSubjectList] = useState<Subject[]>([])
+  const [assignmentList, setAssignmentList] = useState<Assignment[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredAssignments = useMemo(() => {
-    if (subjectFilter === 'all') {
-      return initialAssignments
-    }
+  async function loadData() {
+    setIsLoading(true)
+    setError(null)
 
-    return initialAssignments.filter((assignment) => assignment.subjectId === subjectFilter)
-  }, [subjectFilter])
-
-  function handleCreateSubject(subject: Subject) {
-    const exists = subjectList.some((entry) => entry.id === subject.id || entry.name === subject.name)
-    if (exists) {
+    const { error: defaultError } = await ensureDefaultSubject()
+    if (defaultError) {
+      setError(defaultError.message)
+      setIsLoading(false)
       return
     }
 
-    setSubjectList((current) => [...current, subject])
-    setSubjectFilter(subject.id)
+    const [
+      { data: nextSubjects, error: subjectError },
+      { data: nextAssignments, error: assignmentError },
+    ] = await Promise.all([fetchSubjects(), fetchAssignments()])
+
+    if (subjectError || assignmentError) {
+      setError(subjectError?.message ?? assignmentError?.message ?? '과제 목록을 불러오지 못했습니다.')
+      setSubjectList(nextSubjects ?? [])
+      setAssignmentList(nextAssignments ?? [])
+      setIsLoading(false)
+      return
+    }
+
+    setSubjectList(nextSubjects ?? [])
+    setAssignmentList(nextAssignments ?? [])
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadData()
+    })
+  }, [])
+
+  const activeSubjectFilter =
+    subjectFilter !== 'all' && !subjectList.some((subject) => subject.id === subjectFilter)
+      ? 'all'
+      : subjectFilter
+
+  const filteredAssignments = useMemo(() => {
+    if (activeSubjectFilter === 'all') {
+      return assignmentList
+    }
+
+    return assignmentList.filter((assignment) => assignment.subjectId === activeSubjectFilter)
+  }, [activeSubjectFilter, assignmentList])
+
+  async function handleCreateSubject(name: string, color: string) {
+    setIsSaving(true)
+    setError(null)
+
+    const { data, error: createError } = await createSubject(name, color)
+    if (createError) {
+      setError(createError.message)
+      setIsSaving(false)
+      return
+    }
+
+    if (data) {
+      setSubjectFilter(data.id)
+    }
+
+    setIsSaving(false)
+    setIsSubjectModalOpen(false)
+    await loadData()
+  }
+
+  async function handleToggleSubmitted(assignment: Assignment) {
+    setIsSaving(true)
+    setError(null)
+    const { error: updateError } = await updateAssignment(assignment.id, {
+      submitted: !assignment.submitted,
+    })
+    if (updateError) {
+      setError(updateError.message)
+      setIsSaving(false)
+      return
+    }
+    setIsSaving(false)
+    await loadData()
+  }
+
+  async function handleToggleFavorite(assignment: Assignment) {
+    setIsSaving(true)
+    setError(null)
+    const { error: updateError } = await updateAssignment(assignment.id, {
+      isFavorite: !assignment.isFavorite,
+    })
+    if (updateError) {
+      setError(updateError.message)
+      setIsSaving(false)
+      return
+    }
+    setIsSaving(false)
+    await loadData()
+  }
+
+  async function handleDeleteAssignment(assignment: Assignment) {
+    setIsSaving(true)
+    setError(null)
+    const { error: deleteError } = await deleteAssignment(assignment.id)
+    if (deleteError) {
+      setError(deleteError.message)
+      setIsSaving(false)
+      return
+    }
+    setIsSaving(false)
+    refreshUsage()
+    await loadData()
+  }
+
+  async function handleCreatedAssignment() {
+    refreshUsage()
+    await loadData()
   }
 
   return (
     <>
       <section className={styles.library}>
         <div className={styles.toolbar}>
-          <h1 className={styles.title}>Assignment Library</h1>
+          <h1 className={styles.title}>과제 보관함</h1>
           <div className={styles.actions}>
             <label className={styles.selectShell}>
-              <span className={styles.visuallyHidden}>Filter by subject</span>
-              <select value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}>
-                <option value="all">All Subjects</option>
+              <span className={styles.visuallyHidden}>과목별 필터</span>
+              <select
+                value={activeSubjectFilter}
+                onChange={(event) => setSubjectFilter(event.target.value)}
+              >
+                <option value="all">전체 과목</option>
                 {subjectList.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
@@ -151,80 +292,126 @@ export function AssignmentsPage() {
                 ))}
               </select>
             </label>
-            <button className={styles.ghostButton} type="button" onClick={() => setIsSubjectModalOpen(true)}>
-              + Subject
+            <button
+              className={styles.ghostButton}
+              type="button"
+              onClick={() => setIsSubjectModalOpen(true)}
+            >
+              + 과목
             </button>
             <button
               className={styles.primaryButton}
               type="button"
               onClick={() => setIsAssignmentModalOpen(true)}
             >
-              Add Assignment
+              과제 추가
             </button>
           </div>
         </div>
+
+        {error ? <p className={styles.errorText}>{error}</p> : null}
+        {isLoading ? <p className={styles.helperText}>과제 목록을 불러오는 중입니다...</p> : null}
 
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Subject</th>
-                <th>Title</th>
-                <th>Due Date</th>
-                <th>Submitted</th>
-                <th>Fav</th>
-                <th>Files</th>
-                <th aria-label="Delete" />
+                <th>과목</th>
+                <th>과제명</th>
+                <th>마감일</th>
+                <th>제출</th>
+                <th>즐겨찾기</th>
+                <th>링크</th>
+                <th>파일</th>
+                <th aria-label="삭제" />
               </tr>
             </thead>
             <tbody>
-              {filteredAssignments.map((assignment) => {
-                const subject = getSubject(subjectList, assignment.subjectId)
-                return (
-                  <tr key={assignment.id}>
-                    <td>
-                      <span
-                        className={styles.subjectPill}
-                        style={{ backgroundColor: subject?.color ?? '#d7dee7' }}
+              {!isLoading && filteredAssignments.length === 0 ? (
+                <tr>
+                  <td className={styles.emptyState} colSpan={8}>
+                    이 필터에 맞는 과제가 아직 없습니다.
+                  </td>
+                </tr>
+              ) : null}
+
+              {filteredAssignments.map((assignment) => (
+                <tr key={assignment.id}>
+                  <td>
+                    <span
+                      className={styles.subjectPill}
+                      style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
+                    >
+                      {assignment.subjectName ?? '미지정'}
+                    </span>
+                  </td>
+                  <td className={styles.titleCell}>{assignment.title}</td>
+                  <td>{formatDueDate(assignment.dueDate)}</td>
+                  <td>
+                    <SubmittedToggle
+                      assignment={assignment}
+                      onToggle={handleToggleSubmitted}
+                      disabled={isSaving}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted}
+                      onClick={() => void handleToggleFavorite(assignment)}
+                      disabled={isSaving}
+                      aria-label={assignment.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                    >
+                      *
+                    </button>
+                  </td>
+                  <td>
+                    {assignment.externalLink ? (
+                      <a
+                        className={styles.linkAnchor}
+                        href={assignment.externalLink}
+                        target="_blank"
+                        rel="noreferrer"
                       >
-                        {subject?.name ?? 'Unknown'}
-                      </span>
-                    </td>
-                    <td className={styles.titleCell}>{assignment.title}</td>
-                    <td>{formatDueDate(assignment.dueDate)}</td>
-                    <td>
-                      <SubmittedToggle assignment={assignment} />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted}
-                        aria-label={assignment.isFavorite ? 'Favorited' : 'Not favorited'}
-                      >
-                        ★
-                      </button>
-                    </td>
-                    <td className={styles.filesCell}>{assignment.attachmentCount} files</td>
-                    <td>
-                      <button type="button" className={styles.deleteButton} aria-label="Delete assignment">
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                        열기
+                      </a>
+                    ) : (
+                      <span className={styles.helperText}>없음</span>
+                    )}
+                  </td>
+                  <td className={styles.filesCell}>{assignment.attachmentCount}개</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={styles.deleteButton}
+                      onClick={() => void handleDeleteAssignment(assignment)}
+                      disabled={isSaving}
+                      aria-label="과제 삭제"
+                    >
+                      x
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </section>
 
       {isAssignmentModalOpen ? (
-        <NewAssignmentModal onClose={() => setIsAssignmentModalOpen(false)} />
+        <NewAssignmentModal
+          onClose={() => setIsAssignmentModalOpen(false)}
+          onCreated={handleCreatedAssignment}
+          subjects={subjectList}
+          remainingBytes={Math.max(0, summary.personalLimitBytes - summary.personalBytes)}
+          createAssignment={createAssignmentWithAssets}
+        />
       ) : null}
       {isSubjectModalOpen ? (
         <NewSubjectModal
           onClose={() => setIsSubjectModalOpen(false)}
           onCreate={handleCreateSubject}
+          isSaving={isSaving}
         />
       ) : null}
     </>

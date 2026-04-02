@@ -19,7 +19,7 @@
 .title {
   margin: 0;
   color: #58718a;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 700;
 }
@@ -53,7 +53,7 @@
 }
 
 .selectShell::after {
-  content: '⌄';
+  content: 'v';
   position: absolute;
   right: 1rem;
   color: #58718a;
@@ -132,6 +132,12 @@
   font-weight: 700;
 }
 
+.statusButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
 .statusCircle {
   display: inline-grid;
   place-items: center;
@@ -174,6 +180,31 @@
   color: #c8d1da;
 }
 
+.linkAnchor {
+  color: #58718a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.helperText,
+.errorText {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+}
+
+.helperText {
+  color: #8ea0b0;
+}
+
+.errorText {
+  color: #b15d5d;
+}
+
+.emptyState {
+  color: #8ea0b0;
+  text-align: center;
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -203,7 +234,7 @@
 .subjectModalTitle {
   margin: 0;
   color: #58718a;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 1.3rem;
   font-weight: 700;
 }
@@ -214,6 +245,7 @@
   color: #264056;
   font-size: 2rem;
   line-height: 1;
+  cursor: pointer;
 }
 
 .subjectField {

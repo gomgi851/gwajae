@@ -63,7 +63,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAllowedUser(null)
         setAccessMessage(
           error.code === '42P01'
-            ? 'Run supabase/setup.sql in the SQL editor to create the allowed_users table.'
+            ? 'SQL Editor에서 최신 supabase/setup.sql을 실행해 allowed_users 테이블을 만들어 주세요.'
             : error.message,
         )
         setIsLoading(false)
@@ -72,14 +72,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (!data) {
         setAllowedUser(null)
-        setAccessMessage('This email is not on the allowed user list yet.')
+        setAccessMessage('이 이메일은 아직 허용 사용자 목록에 없습니다.')
         setIsLoading(false)
         return
       }
 
       if (!data.active) {
         setAllowedUser(data)
-        setAccessMessage('This account has been disabled by an admin.')
+        setAccessMessage('이 계정은 관리자에 의해 비활성화되었습니다.')
         setIsLoading(false)
         return
       }

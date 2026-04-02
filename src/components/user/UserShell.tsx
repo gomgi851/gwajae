@@ -4,8 +4,8 @@ import { TopTabs } from '../common/TopTabs'
 import styles from './UserShell.module.css'
 
 const userTabs = [
-  { label: 'Home', to: '/' },
-  { label: 'Assignments', to: '/assignments' },
+  { label: '홈', to: '/' },
+  { label: '과제 관리', to: '/assignments' },
 ]
 
 export function UserShell() {
@@ -20,11 +20,11 @@ export function UserShell() {
             <span className={styles.accountEmail}>{user?.email}</span>
             {isAdmin ? (
               <a className={styles.adminLink} href="/admin">
-                Admin space
+                관리자 공간
               </a>
             ) : null}
             <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
-              Sign out
+              로그아웃
             </button>
           </div>
         </div>

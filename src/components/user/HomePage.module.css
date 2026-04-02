@@ -39,7 +39,7 @@
 .cardTitle,
 .panelTitle {
   margin: 0 0 1rem;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 1.12rem;
   font-weight: 700;
   color: #58718a;

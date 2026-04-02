@@ -7,7 +7,7 @@ import type { AllowedUser } from '../../types'
 import { TopTabs } from '../common/TopTabs'
 import styles from './AdminPage.module.css'
 
-const adminTabs = [{ label: 'Admin', to: '/admin' }]
+const adminTabs = [{ label: '관리자', to: '/admin' }]
 
 function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
   const percentage = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0
@@ -15,15 +15,15 @@ function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: numb
   return (
     <section className={styles.storageCard}>
       <div>
-        <p className={styles.storageLabel}>Project Storage</p>
-        <h2 className={styles.storageTitle}>Group Total Usage</h2>
+        <p className={styles.storageLabel}>프로젝트 저장공간</p>
+        <h2 className={styles.storageTitle}>전체 업로드 사용량</h2>
       </div>
       <div className={styles.storageMeta}>
         <div className={styles.storageTrack} aria-hidden="true">
           <div className={styles.storageFill} style={{ width: `${percentage}%` }} />
         </div>
         <p className={styles.storageText}>
-          {usedMb}MB of {totalMb / 1024}GB used
+          {usedMb}MB / {totalMb / 1024}GB 사용 중
         </p>
       </div>
     </section>
@@ -70,13 +70,13 @@ export function AdminPage() {
     const normalizedEmail = inviteEmail.trim().toLowerCase()
 
     if (!normalizedEmail) {
-      setError('Enter a Google email before inviting a user.')
+      setError('초대할 구글 이메일을 입력해 주세요.')
       return
     }
 
     const alreadyExists = allowedUsers.some((entry) => entry.email === normalizedEmail)
     if (alreadyExists) {
-      setError('That email is already on the allowed user list.')
+      setError('이미 허용 목록에 있는 이메일입니다.')
       return
     }
 
@@ -98,7 +98,7 @@ export function AdminPage() {
 
   async function toggleRole(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('You cannot change your own admin role from this screen.')
+      setError('현재 로그인한 내 관리자 권한은 여기서 바꿀 수 없습니다.')
       return
     }
 
@@ -120,7 +120,7 @@ export function AdminPage() {
 
   async function toggleActive(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('You cannot disable your own admin account from this screen.')
+      setError('현재 로그인한 내 계정은 여기서 비활성화할 수 없습니다.')
       return
     }
 
@@ -153,16 +153,16 @@ export function AdminPage() {
         <section className={styles.panel}>
           <div className={styles.toolbar}>
             <div>
-              <h1 className={styles.title}>User Management</h1>
-              <p className={styles.subtitle}>{user?.email ?? 'Admin account'}</p>
+              <h1 className={styles.title}>사용자 관리</h1>
+              <p className={styles.subtitle}>{user?.email ?? '관리자 계정'}</p>
             </div>
             <div className={styles.sideControls}>
               <div className={styles.inviteRow}>
                 <input
                   className={styles.input}
                   type="email"
-                  placeholder="Enter google email..."
-                  aria-label="Invite user email"
+                  placeholder="허용할 구글 이메일 입력"
+                  aria-label="초대할 사용자 이메일"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
                 />
@@ -172,14 +172,14 @@ export function AdminPage() {
                   onClick={() => void handleInvite()}
                   disabled={isSaving}
                 >
-                  Invite User
+                  사용자 추가
                 </button>
               </div>
               <Link className={styles.appLinkButton} to="/">
-                Open app
+                일반 화면
               </Link>
               <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
-                Sign out
+                로그아웃
               </button>
             </div>
           </div>
@@ -187,18 +187,18 @@ export function AdminPage() {
           {error ? <p className={styles.errorText}>{error}</p> : null}
           {storageError ? (
             <p className={styles.helperText}>
-              Project storage is based on uploaded assignment files, not database size or runtime usage.
+              이 저장공간 수치는 데이터베이스가 아니라 사용자가 올린 첨부파일 총합 기준입니다.
             </p>
           ) : null}
-          {isLoading ? <p className={styles.helperText}>Loading allowed users...</p> : null}
+          {isLoading ? <p className={styles.helperText}>허용된 사용자를 불러오는 중입니다...</p> : null}
 
           {!isLoading ? (
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Email Address</th>
-                  <th>Role</th>
-                  <th>Status</th>
+                  <th>이메일</th>
+                  <th>권한</th>
+                  <th>상태</th>
                   <th />
                 </tr>
               </thead>
@@ -215,7 +215,7 @@ export function AdminPage() {
                         onClick={() => void toggleRole(entry)}
                         disabled={isSaving || entry.email === currentEmail}
                       >
-                        {entry.role === 'admin' ? 'Admin' : 'Member'}
+                        {entry.role === 'admin' ? '관리자' : '일반'}
                       </button>
                     </td>
                     <td>
@@ -226,7 +226,7 @@ export function AdminPage() {
                         disabled={isSaving || entry.email === currentEmail}
                       >
                         <span className={styles.statusDot} />
-                        {entry.active ? 'Active' : 'Inactive'}
+                        {entry.active ? '활성' : '비활성'}
                       </button>
                     </td>
                     <td>
@@ -236,7 +236,7 @@ export function AdminPage() {
                         onClick={() => void toggleRole(entry)}
                         disabled={isSaving || entry.email === currentEmail}
                       >
-                        {entry.role === 'admin' ? 'Make member' : 'Make admin'}
+                        {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
                       </button>
                     </td>
                   </tr>

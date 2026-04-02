@@ -22,8 +22,8 @@ export function UserGuard({ children }: PropsWithChildren) {
   if (!isConfigured) {
     return (
       <FullPageMessage
-        title="Supabase Setup Needed"
-        description="Add your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to start Google login."
+        title="Supabase 설정이 필요합니다"
+        description="Google 로그인을 쓰려면 VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 먼저 넣어 주세요."
       />
     )
   }
@@ -31,8 +31,8 @@ export function UserGuard({ children }: PropsWithChildren) {
   if (isLoading) {
     return (
       <FullPageMessage
-        title="Checking Session"
-        description="Looking for your Google login session."
+        title="로그인 확인 중"
+        description="현재 Google 로그인 세션을 확인하고 있습니다."
       />
     )
   }
@@ -45,10 +45,10 @@ export function UserGuard({ children }: PropsWithChildren) {
     return (
       <div className={styles.statePage}>
         <div className={styles.stateCard}>
-          <h1>Access Not Yet Allowed</h1>
-          <p>{accessMessage ?? 'Ask an admin to add your email to the allowed user list.'}</p>
+          <h1>아직 접근이 허용되지 않았습니다</h1>
+          <p>{accessMessage ?? '관리자에게 허용 이메일 목록에 추가해 달라고 요청해 주세요.'}</p>
           <button className={styles.actionButton} onClick={() => void signOut()} type="button">
-            Sign out
+            로그아웃
           </button>
         </div>
       </div>
@@ -66,8 +66,8 @@ export function AdminGuard({ children }: PropsWithChildren) {
   if (!isConfigured) {
     return (
       <FullPageMessage
-        title="Supabase Setup Needed"
-        description="Connect Supabase and add admin emails before opening the admin space."
+        title="Supabase 설정이 필요합니다"
+        description="관리자 공간을 열기 전에 Supabase 연결과 관리자 이메일 설정이 먼저 필요합니다."
       />
     )
   }
@@ -75,8 +75,8 @@ export function AdminGuard({ children }: PropsWithChildren) {
   if (isLoading) {
     return (
       <FullPageMessage
-        title="Checking Access"
-        description="Confirming whether this account can open the admin space."
+        title="권한 확인 중"
+        description="이 계정이 관리자 공간에 접근할 수 있는지 확인하고 있습니다."
       />
     )
   }
@@ -88,8 +88,8 @@ export function AdminGuard({ children }: PropsWithChildren) {
   if (!isAuthorized) {
     return (
       <FullPageMessage
-        title="Access Not Yet Allowed"
-        description={accessMessage ?? 'Ask an admin to add your email first.'}
+        title="아직 접근이 허용되지 않았습니다"
+        description={accessMessage ?? '먼저 관리자에게 이메일 추가를 요청해 주세요.'}
       />
     )
   }
@@ -97,8 +97,8 @@ export function AdminGuard({ children }: PropsWithChildren) {
   if (!isAdmin) {
     return (
       <FullPageMessage
-        title="Admin Access Only"
-        description="This screen is reserved for accounts with the admin role in allowed_users."
+        title="관리자 전용 화면입니다"
+        description="이 화면은 allowed_users 테이블에서 admin 역할을 가진 계정만 사용할 수 있습니다."
       />
     )
   }
