@@ -1,11 +1,9 @@
 import type { CSSProperties } from 'react'
-import { assignments, personalUsage, projectUsage, subjects } from '../../data/mockData'
-import type { Assignment, UsageStat } from '../../types'
+import { useAuth } from '../../auth/useAuth'
+import { assignments, subjects } from '../../data/mockData'
+import { useStorageUsage } from '../../hooks/useStorageUsage'
+import type { Assignment } from '../../types'
 import styles from './HomePage.module.css'
-
-interface HomePageProps {
-  isAdminPreview?: boolean
-}
 
 function getSubjectColor(subjectId: string) {
   return subjects.find((subject) => subject.id === subjectId)?.color ?? '#d7dee7'
@@ -15,12 +13,12 @@ function getSubjectName(subjectId: string) {
   return subjects.find((subject) => subject.id === subjectId)?.name ?? 'Unknown'
 }
 
-function UsageCard({ stat }: { stat: UsageStat }) {
-  const percentage = Math.round((stat.used / stat.total) * 100)
+function UsageCard({ used, total }: { used: number; total: number }) {
+  const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 
   return (
     <section className={styles.card}>
-      <h2 className={styles.cardTitle}>{stat.label}</h2>
+      <h2 className={styles.cardTitle}>Storage</h2>
       <div
         className={styles.progressRing}
         style={
@@ -34,19 +32,17 @@ function UsageCard({ stat }: { stat: UsageStat }) {
           <span>USED</span>
         </div>
       </div>
-      <p className={styles.usageLabel}>
-        {stat.used}MB of {stat.total}MB used
-      </p>
+      <p className={styles.usageLabel}>{used}MB of {total}MB used</p>
     </section>
   )
 }
 
-function TotalUsageCard({ stat }: { stat: UsageStat }) {
-  const percentage = Math.round((stat.used / stat.total) * 100)
+function TotalUsageCard({ used, totalMb }: { used: number; totalMb: number }) {
+  const percentage = totalMb > 0 ? Math.min(100, Math.round((used / totalMb) * 100)) : 0
 
   return (
     <section className={styles.card}>
-      <h2 className={styles.cardTitle}>{stat.label}</h2>
+      <h2 className={styles.cardTitle}>Group Total</h2>
       <div className={styles.barTrack}>
         <div
           className={styles.barFill}
@@ -54,9 +50,7 @@ function TotalUsageCard({ stat }: { stat: UsageStat }) {
           aria-hidden="true"
         />
       </div>
-      <p className={styles.usageLabel}>
-        {stat.used}MB of {stat.total / 1000}GB used by group
-      </p>
+      <p className={styles.usageLabel}>{used}MB of {totalMb / 1024}GB used by group</p>
     </section>
   )
 }
@@ -103,15 +97,20 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
   )
 }
 
-export function HomePage({ isAdminPreview = true }: HomePageProps) {
+export function HomePage() {
+  const { isAdmin } = useAuth()
+  const { personalUsedMb, personalLimitMb, totalUsedMb, totalLimitMb, error } = useStorageUsage()
   const favoriteAssignments = assignments.filter((assignment) => assignment.isFavorite)
   const upcomingAssignments = assignments.slice(0, 3)
 
   return (
     <div className={styles.grid}>
       <div className={styles.leftColumn}>
-        <UsageCard stat={personalUsage} />
-        {isAdminPreview ? <TotalUsageCard stat={projectUsage} /> : null}
+        <UsageCard used={personalUsedMb} total={personalLimitMb} />
+        {isAdmin ? <TotalUsageCard used={totalUsedMb} totalMb={totalLimitMb} /> : null}
+        {error ? (
+          <p className={styles.helperText}>Storage numbers reflect uploaded files after the asset table is in place.</p>
+        ) : null}
       </div>
 
       <section className={`${styles.panel} ${styles.tallPanel}`}>

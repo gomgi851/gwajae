@@ -31,3 +31,10 @@ export interface UsageStat {
   used: number
   total: number
 }
+
+export interface StorageUsageSummary {
+  personalBytes: number
+  totalBytes: number
+  personalLimitBytes: number
+  totalLimitBytes: number
+}

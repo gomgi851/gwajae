@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { projectUsage } from '../../data/mockData'
 import { useAuth } from '../../auth/useAuth'
+import { useStorageUsage } from '../../hooks/useStorageUsage'
 import { fetchAllowedUsers, inviteAllowedUser, updateAllowedUser } from '../../lib/allowedUsers'
 import type { AllowedUser } from '../../types'
 import { TopTabs } from '../common/TopTabs'
@@ -9,8 +9,8 @@ import styles from './AdminPage.module.css'
 
 const adminTabs = [{ label: 'Admin', to: '/admin' }]
 
-function ProjectStorageCard() {
-  const percentage = Math.round((projectUsage.used / projectUsage.total) * 100)
+function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
+  const percentage = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0
 
   return (
     <section className={styles.storageCard}>
@@ -23,7 +23,7 @@ function ProjectStorageCard() {
           <div className={styles.storageFill} style={{ width: `${percentage}%` }} />
         </div>
         <p className={styles.storageText}>
-          {projectUsage.used}MB of {projectUsage.total / 1000}GB used
+          {usedMb}MB of {totalMb / 1024}GB used
         </p>
       </div>
     </section>
@@ -32,6 +32,7 @@ function ProjectStorageCard() {
 
 export function AdminPage() {
   const { user, signOut } = useAuth()
+  const { totalUsedMb, totalLimitMb, error: storageError } = useStorageUsage()
   const [allowedUsers, setAllowedUsers] = useState<AllowedUser[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -147,7 +148,7 @@ export function AdminPage() {
       </header>
 
       <main className={styles.main}>
-        <ProjectStorageCard />
+        <ProjectStorageCard usedMb={totalUsedMb} totalMb={totalLimitMb} />
 
         <section className={styles.panel}>
           <div className={styles.toolbar}>
@@ -184,6 +185,11 @@ export function AdminPage() {
           </div>
 
           {error ? <p className={styles.errorText}>{error}</p> : null}
+          {storageError ? (
+            <p className={styles.helperText}>
+              Project storage is based on uploaded assignment files, not database size or runtime usage.
+            </p>
+          ) : null}
           {isLoading ? <p className={styles.helperText}>Loading allowed users...</p> : null}
 
           {!isLoading ? (

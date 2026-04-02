@@ -172,6 +172,13 @@
   color: #f1c43a;
 }
 
+.helperText {
+  margin: -0.2rem 0 0;
+  color: #98a8b7;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 860px) {
   .grid {
     grid-template-columns: 1fr;
