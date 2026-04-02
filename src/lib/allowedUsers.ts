@@ -33,6 +33,18 @@ export async function fetchAllowedUsers() {
   }
 }
 
+export async function syncAllowedUserAuth(email: string, authUserId: string, role: Role = 'member') {
+  if (!supabase) {
+    return { data: null, error: null }
+  }
+
+  return supabase.rpc('sync_allowed_user_auth', {
+    p_email: email.toLowerCase(),
+    p_auth_user_id: authUserId,
+    p_default_role: role,
+  })
+}
+
 export async function inviteAllowedUser(email: string, role: Role = 'member') {
   if (!supabase) {
     return { data: null, error: null }

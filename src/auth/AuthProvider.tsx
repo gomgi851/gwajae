@@ -2,7 +2,7 @@ import type { PropsWithChildren } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 import type { AllowedUser } from '../types'
-import { fetchAllowedUserByEmail } from '../lib/allowedUsers'
+import { fetchAllowedUserByEmail, syncAllowedUserAuth } from '../lib/allowedUsers'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
 function getAdminEmails() {
@@ -37,6 +37,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!email) {
         setAllowedUser(null)
         setAccessMessage(null)
+        setIsLoading(false)
+        return
+      }
+
+      const defaultRole = adminEmails.includes(email) ? 'admin' : 'member'
+      const { error: syncError } = await syncAllowedUserAuth(email, nextSession!.user.id, defaultRole)
+
+      if (syncError && !adminEmails.includes(email)) {
+        setAllowedUser(null)
+        setAccessMessage(syncError.message)
         setIsLoading(false)
         return
       }

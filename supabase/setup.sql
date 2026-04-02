@@ -21,12 +21,16 @@ $$;
 create table if not exists public.allowed_users (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,
+  auth_user_id uuid unique references auth.users(id) on delete set null,
   role text not null default 'member' check (role in ('admin', 'member')),
   active boolean not null default true,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   check (email = lower(email))
 );
+
+alter table public.allowed_users
+add column if not exists auth_user_id uuid unique references auth.users(id) on delete set null;
 
 drop trigger if exists allowed_users_set_updated_at on public.allowed_users;
 create trigger allowed_users_set_updated_at
@@ -65,6 +69,44 @@ as $$
       and active = true
       and email = 'yoonggee95@gmail.com'
   )
+$$;
+
+create or replace function public.sync_allowed_user_auth(
+  p_email text,
+  p_auth_user_id uuid,
+  p_default_role text default 'member'
+)
+returns public.allowed_users
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  normalized_email text;
+  row_result public.allowed_users;
+begin
+  normalized_email := lower(coalesce(p_email, ''));
+
+  if normalized_email = '' or p_auth_user_id is null then
+    raise exception 'email and auth user id are required';
+  end if;
+
+  insert into public.allowed_users (email, auth_user_id, role, active)
+  values (
+    normalized_email,
+    p_auth_user_id,
+    case
+      when p_default_role in ('admin', 'member') then p_default_role
+      else 'member'
+    end,
+    true
+  )
+  on conflict (email) do update
+  set auth_user_id = excluded.auth_user_id
+  returning * into row_result;
+
+  return row_result;
+end;
 $$;
 
 alter table public.allowed_users enable row level security;
@@ -461,10 +503,11 @@ as $$
   left join auth.users u
     on lower(coalesce(u.email::text, '')) = au.email
   left join public.assignment_assets aa
-    on aa.owner_user_id = u.id
+    on aa.owner_user_id = coalesce(au.auth_user_id, u.id)
   where public.is_admin_user()
   group by au.id, au.email, au.role, au.active, au.created_at
   order by au.created_at asc
 $$;
 
 grant execute on function public.get_admin_allowed_users_with_usage() to authenticated;
+grant execute on function public.sync_allowed_user_auth(text, uuid, text) to authenticated;
