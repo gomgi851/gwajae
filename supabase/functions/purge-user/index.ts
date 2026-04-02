@@ -30,7 +30,7 @@ Deno.serve(async (request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const supabaseServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
   const authHeader = request.headers.get('Authorization')
 
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
