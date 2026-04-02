@@ -82,5 +82,7 @@ export async function deleteAllowedUser(id: string) {
     return { error: null }
   }
 
-  return supabase.from('allowed_users').delete().eq('id', id)
+  return supabase.rpc('purge_allowed_user', {
+    p_allowed_user_id: id,
+  })
 }

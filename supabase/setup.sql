@@ -109,6 +109,55 @@ begin
 end;
 $$;
 
+create or replace function public.purge_allowed_user(p_allowed_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_email text;
+  target_auth_user_id uuid;
+begin
+  if not public.is_super_admin_user() then
+    raise exception 'only super admin can purge users';
+  end if;
+
+  select email, auth_user_id
+  into target_email, target_auth_user_id
+  from public.allowed_users
+  where id = p_allowed_user_id;
+
+  if target_email is null then
+    raise exception 'allowed user not found';
+  end if;
+
+  if target_email = public.current_auth_email() then
+    raise exception 'cannot delete current logged-in super admin account';
+  end if;
+
+  if target_auth_user_id is null then
+    select u.id
+    into target_auth_user_id
+    from auth.users u
+    where lower(coalesce(u.email::text, '')) = target_email
+    limit 1;
+  end if;
+
+  if target_auth_user_id is not null then
+    delete from storage.objects
+    where bucket_id = 'assignment-assets'
+      and (storage.foldername(name))[1] = target_auth_user_id::text;
+
+    delete from auth.users
+    where id = target_auth_user_id;
+  end if;
+
+  delete from public.allowed_users
+  where id = p_allowed_user_id;
+end;
+$$;
+
 alter table public.allowed_users enable row level security;
 
 drop policy if exists "allowed_users_select_self_or_admin" on public.allowed_users;
@@ -511,3 +560,4 @@ $$;
 
 grant execute on function public.get_admin_allowed_users_with_usage() to authenticated;
 grant execute on function public.sync_allowed_user_auth(text, uuid, text) to authenticated;
+grant execute on function public.purge_allowed_user(uuid) to authenticated;

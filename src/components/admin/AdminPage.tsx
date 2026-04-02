@@ -194,7 +194,9 @@ export function AdminPage() {
       return
     }
 
-    const confirmed = window.confirm(`${entry.email} 계정을 허용 목록에서 삭제할까요?`)
+    const confirmed = window.confirm(
+      `${entry.email} 사용자를 완전히 삭제할까요?\n\n과제, 첨부 파일, 업로드된 스토리지 파일, 접근 권한이 모두 함께 삭제되며 되돌릴 수 없습니다.`,
+    )
     if (!confirmed) {
       return
     }
