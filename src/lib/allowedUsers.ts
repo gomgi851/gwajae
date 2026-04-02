@@ -1,16 +1,49 @@
 import type { AllowedUser, Role } from '../types'
 import { supabase } from './supabase'
 
+interface AllowedUserRpcRow {
+  id: string
+  email: string
+  role: Role
+  active: boolean
+  created_at?: string
+  usage_bytes?: number | null
+  usage_limit_bytes?: number | null
+}
+
+function mapAllowedUserRow(row: AllowedUserRpcRow): AllowedUser {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    active: row.active,
+    created_at: row.created_at,
+    usageBytes: Number(row.usage_bytes ?? 0),
+    usageLimitBytes: Number(row.usage_limit_bytes ?? 0),
+  }
+}
+
 export async function fetchAllowedUserByEmail(email: string) {
   if (!supabase) {
     return { data: null, error: null }
   }
 
-  return supabase
+  const { data, error } = await supabase
     .from('allowed_users')
     .select('id,email,role,active,created_at')
     .eq('email', email.toLowerCase())
     .maybeSingle<AllowedUser>()
+
+  return {
+    data: data
+      ? {
+          ...data,
+          usageBytes: 0,
+          usageLimitBytes: 100 * 1024 * 1024,
+        }
+      : null,
+    error,
+  }
 }
 
 export async function fetchAllowedUsers() {
@@ -28,7 +61,7 @@ export async function fetchAllowedUsers() {
   }
 
   return {
-    data: (data ?? []) as AllowedUser[],
+    data: ((data ?? []) as AllowedUserRpcRow[]).map(mapAllowedUserRow),
     error: null,
   }
 }
