@@ -302,11 +302,11 @@ export function AssignmentsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>고정</th>
                 <th>과목</th>
                 <th>과제명</th>
                 <th>마감일시</th>
                 <th>제출</th>
-                <th>고정</th>
                 <th>링크</th>
                 <th>파일</th>
                 <th>수정</th>
@@ -325,6 +325,19 @@ export function AssignmentsPage() {
               {filteredAssignments.map((assignment) => (
                 <tr key={assignment.id}>
                   <td>
+                    <button
+                      type="button"
+                      className={
+                        assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted
+                      }
+                      onClick={() => void handleToggleFavorite(assignment)}
+                      disabled={isSaving}
+                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위에 고정'}
+                    >
+                      <PinIcon className={styles.pinIcon} />
+                    </button>
+                  </td>
+                  <td>
                     <span
                       className={styles.subjectPill}
                       style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
@@ -340,19 +353,6 @@ export function AssignmentsPage() {
                       onToggle={handleToggleSubmitted}
                       disabled={isSaving}
                     />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className={
-                        assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted
-                      }
-                      onClick={() => void handleToggleFavorite(assignment)}
-                      disabled={isSaving}
-                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위에 고정'}
-                    >
-                      <PinIcon className={styles.pinIcon} />
-                    </button>
                   </td>
                   <td>
                     {assignment.externalLink ? (
