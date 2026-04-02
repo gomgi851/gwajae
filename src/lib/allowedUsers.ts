@@ -110,14 +110,58 @@ export async function updateAllowedUser(
     .single<AllowedUser>()
 }
 
+async function normalizeFunctionInvokeError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return { message: '알 수 없는 오류가 발생했습니다.' }
+  }
+
+  const defaultMessage =
+    'message' in error && typeof error.message === 'string'
+      ? error.message
+      : '알 수 없는 오류가 발생했습니다.'
+
+  const maybeContext =
+    'context' in error && error.context && typeof error.context === 'object' ? error.context : null
+
+  if (!maybeContext || typeof (maybeContext as Response).json !== 'function') {
+    return { message: defaultMessage }
+  }
+
+  try {
+    const response = maybeContext as Response
+    const payload = (await response.json()) as { error?: string; message?: string }
+
+    if (typeof payload?.error === 'string' && payload.error.trim()) {
+      return { message: payload.error }
+    }
+
+    if (typeof payload?.message === 'string' && payload.message.trim()) {
+      return { message: payload.message }
+    }
+  } catch {
+    // Fall back to the SDK error message when the response body isn't JSON.
+  }
+
+  return { message: defaultMessage }
+}
+
 export async function deleteAllowedUser(id: string) {
   if (!supabase) {
     return { error: null }
   }
 
-  return supabase.functions.invoke('purge-user', {
+  const { data, error } = await supabase.functions.invoke('purge-user', {
     body: {
       allowedUserId: id,
     },
   })
+
+  if (error) {
+    return {
+      data: null,
+      error: await normalizeFunctionInvokeError(error),
+    }
+  }
+
+  return { data, error: null }
 }
