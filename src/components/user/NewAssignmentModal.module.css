@@ -1,0 +1,151 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: rgba(149, 159, 172, 0.36);
+  backdrop-filter: blur(12px);
+  z-index: 30;
+}
+
+.modal {
+  width: min(100%, 39rem);
+  overflow: hidden;
+  border-radius: 1.8rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 28px 80px rgba(93, 107, 120, 0.24);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.55rem 1.7rem;
+  background: linear-gradient(90deg, rgba(219, 245, 249, 0.9), rgba(251, 229, 236, 0.9));
+}
+
+.title {
+  margin: 0;
+  color: #58718a;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.closeButton {
+  border: none;
+  background: transparent;
+  color: #264056;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1.18fr 0.82fr;
+  gap: 1.45rem;
+  padding: 1.6rem;
+}
+
+.formColumn,
+.uploadColumn {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.field,
+.uploadField {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span,
+.uploadField span {
+  color: #7a93aa;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  border: 1px solid #e7edf1;
+  border-radius: 0.95rem;
+  padding: 0.92rem 1rem;
+  box-sizing: border-box;
+  color: #58718a;
+  font: inherit;
+  background: #ffffff;
+}
+
+.field textarea {
+  resize: none;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #b1bdc8;
+}
+
+.dropzone {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  min-height: 8.9rem;
+  padding: 1rem;
+  border: 1.5px dashed #d8e1e8;
+  border-radius: 1.2rem;
+  background: rgba(251, 252, 253, 0.9);
+  color: #a3b4c3;
+  font: inherit;
+}
+
+.cloud {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.checkboxRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #7a93aa;
+  font-weight: 600;
+}
+
+.checkboxRow input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #57718a;
+}
+
+.submitButton {
+  border: none;
+  border-radius: 999px;
+  padding: 1.02rem 1.2rem;
+  background: #58718a;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(88, 113, 138, 0.22);
+}
+
+@media (max-width: 720px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+  }
+}

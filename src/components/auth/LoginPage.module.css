@@ -1,0 +1,123 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.card {
+  width: min(100%, 34rem);
+  padding: 2.3rem;
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 18px 42px rgba(138, 152, 171, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(18px);
+}
+
+.badge {
+  display: inline-flex;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #5f7891;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(228, 236, 241, 0.9);
+}
+
+.title {
+  margin: 1rem 0 0.65rem;
+  color: #58718a;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.4rem;
+  line-height: 1.08;
+}
+
+.description {
+  margin: 0;
+  color: #7f95a8;
+  font-size: 1rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  border: none;
+  border-radius: 999px;
+  padding: 0.95rem 1.2rem;
+  font: inherit;
+  font-weight: 700;
+}
+
+.primaryButton {
+  background: #58718a;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(88, 113, 138, 0.22);
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.9);
+  color: #58718a;
+  box-shadow: inset 0 0 0 1px rgba(228, 236, 241, 0.9);
+}
+
+.infoBox {
+  margin-top: 1.5rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1.2rem;
+  background: rgba(247, 250, 252, 0.88);
+  color: #7f95a8;
+}
+
+.infoBox strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #58718a;
+}
+
+.infoBox p {
+  margin: 0;
+}
+
+.warningBox {
+  margin-top: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1.2rem;
+  background: rgba(255, 243, 232, 0.92);
+  color: #8a6a52;
+}
+
+.warningBox strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.warningBox p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1.5rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

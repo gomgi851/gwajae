@@ -1,0 +1,185 @@
+.grid {
+  display: grid;
+  grid-template-columns: 0.78fr 1.42fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.leftColumn {
+  display: grid;
+  gap: 1rem;
+}
+
+.card,
+.panel {
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 18px 42px rgba(138, 152, 171, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(18px);
+}
+
+.card {
+  padding: 1.35rem 1.1rem 1.05rem;
+}
+
+.panel {
+  padding: 1.25rem 1rem;
+}
+
+.tallPanel {
+  grid-row: span 2;
+}
+
+.bottomPanel {
+  grid-column: 2;
+}
+
+.cardTitle,
+.panelTitle {
+  margin: 0 0 1rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #58718a;
+}
+
+.progressRing {
+  --progress-angle: 244deg;
+
+  width: 7.5rem;
+  height: 7.5rem;
+  margin: 0.6rem auto 1rem;
+  border-radius: 50%;
+  background: conic-gradient(#57718a var(--progress-angle), #dbe3ea 0deg);
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.progressRing::before {
+  content: '';
+  position: absolute;
+  inset: 0.62rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.progressInner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.1rem;
+  text-align: center;
+  color: #57718a;
+}
+
+.progressInner strong {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.progressInner span,
+.usageLabel,
+.assignmentDetail {
+  color: #98a8b7;
+  font-size: 0.76rem;
+}
+
+.barTrack {
+  overflow: hidden;
+  height: 0.28rem;
+  margin: 0.7rem 0 0.65rem;
+  border-radius: 999px;
+  background: #e7ebef;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: inherit;
+  background: #57718a;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 0.5rem;
+  border-top: 1px solid rgba(147, 163, 178, 0.14);
+}
+
+.listRow:first-child {
+  border-top: none;
+  padding-top: 0.2rem;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.subjectPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4rem;
+  padding: 0.24rem 0.5rem;
+  border-radius: 999px;
+  color: #59728a;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.assignmentName {
+  margin: 0;
+  color: #58718a;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.assignmentDetail {
+  margin-top: 0.18rem;
+}
+
+.rowButton {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border: 1.5px solid #8ba3b8;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.star {
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #d2dbe2;
+}
+
+.starActive {
+  color: #f1c43a;
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tallPanel,
+  .bottomPanel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
