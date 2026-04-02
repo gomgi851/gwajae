@@ -93,7 +93,7 @@
 
 .table {
   width: 100%;
-  min-width: 56rem;
+  min-width: 0;
   border-collapse: collapse;
   color: #8ea0b0;
   font-size: 0.84rem;
@@ -165,8 +165,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.3rem;
+  height: 2.3rem;
   border-radius: 999px;
   line-height: 1;
 }
@@ -181,8 +181,8 @@
 
 .pinIcon,
 .editIcon {
-  width: 1rem;
-  height: 1rem;
+  width: 1.28rem;
+  height: 1.28rem;
 }
 
 .filesCell {
