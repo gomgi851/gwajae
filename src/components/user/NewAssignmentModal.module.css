@@ -82,8 +82,8 @@
 }
 
 .tabButtonActive {
-  border-bottom-color: #5340c0;
-  color: #5340c0;
+  border-bottom-color: #58718a;
+  color: #58718a;
 }
 
 .tabBadge {
@@ -94,8 +94,8 @@
   height: 1.35rem;
   padding: 0 0.38rem;
   border-radius: 999px;
-  background: #cecbf6;
-  color: #3c3489;
+  background: #dfe8f1;
+  color: #58718a;
   font-size: 0.73rem;
   font-weight: 700;
 }
@@ -170,8 +170,8 @@
 .field select:focus,
 .field textarea:focus,
 .timeInput:focus {
-  border-color: #5340c0;
-  box-shadow: 0 0 0 3px rgba(83, 64, 192, 0.1);
+  border-color: #58718a;
+  box-shadow: 0 0 0 3px rgba(88, 113, 138, 0.12);
 }
 
 .field input::placeholder,
@@ -224,8 +224,8 @@
 }
 
 .meridiemButtonActive {
-  background: #eeedfe;
-  color: #3c3489;
+  background: #e4ebf1;
+  color: #58718a;
   font-weight: 700;
 }
 
@@ -413,7 +413,7 @@
 }
 
 .toggleActive {
-  background: #5340c0;
+  background: #58718a;
 }
 
 .toggleKnob {
@@ -464,12 +464,16 @@
   border: none;
   border-radius: 0.7rem;
   padding: 0.82rem 1.45rem;
-  background: #5340c0;
+  background: #58718a;
   color: #ffffff;
   font: inherit;
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.saveButton:hover {
+  background: #49647f;
 }
 
 .saveButton:disabled {
