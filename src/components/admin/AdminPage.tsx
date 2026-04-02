@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { useI18n } from '../../i18n/useI18n'
 import { useStorageUsage } from '../../hooks/useStorageUsage'
 import {
   deleteAllowedUser,
@@ -22,15 +23,17 @@ function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: numb
   return (
     <section className={styles.storageCard}>
       <div>
-        <p className={styles.storageLabel}>프로젝트 저장 공간</p>
-        <h2 className={styles.storageTitle}>전체 업로드 사용량</h2>
+        <p className={styles.storageLabel}>{labels.projectStorage}</p>
+        <h2 className={styles.storageTitle}>{labels.totalUploadUsage}</h2>
       </div>
       <div className={styles.storageMeta}>
         <div className={styles.storageTrack} aria-hidden="true">
           <div className={styles.storageFill} style={{ width: `${percentage}%` }} />
         </div>
         <p className={styles.storageText}>
-          {usedMb}MB / {totalMb / 1024}GB 사용 중
+          {labels.storageUsed
+            .replace('{used}', String(usedMb))
+            .replace('{total}', String(totalMb / 1024))}
         </p>
       </div>
     </section>
@@ -72,6 +75,7 @@ function UserStorageCell({ entry }: { entry: AllowedUser }) {
 
 export function AdminPage() {
   const { user, signOut } = useAuth()
+  const { t } = useI18n()
   const { totalUsedMb, totalLimitMb, error: storageError } = useStorageUsage()
   const [allowedUsers, setAllowedUsers] = useState<AllowedUser[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
@@ -81,6 +85,8 @@ export function AdminPage() {
 
   const currentEmail = user?.email?.toLowerCase() ?? ''
   const isSuperAdmin = currentEmail === SUPER_ADMIN_EMAIL
+
+  const adminTabs = [{ label: t.tabs.admin, to: '/admin' }]
 
   async function loadAllowedUsers(options?: { keepLoadingState?: boolean }) {
     if (!options?.keepLoadingState) {
@@ -111,13 +117,13 @@ export function AdminPage() {
     const normalizedEmail = inviteEmail.trim().toLowerCase()
 
     if (!normalizedEmail) {
-      setError('초대할 구글 이메일을 입력해 주세요.')
+      setError(t.admin.inviteRequired)
       return
     }
 
     const alreadyExists = allowedUsers.some((entry) => entry.email === normalizedEmail)
     if (alreadyExists) {
-      setError('이미 허용 목록에 있는 이메일입니다.')
+      setError(t.admin.alreadyExists)
       return
     }
 
@@ -161,7 +167,7 @@ export function AdminPage() {
 
   async function toggleActive(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 계정은 여기서 비활성화할 수 없습니다.')
+      setError(t.admin.cannotDeactivateSelf)
       return
     }
 
@@ -215,23 +221,23 @@ export function AdminPage() {
           <TopTabs items={adminTabs} />
           <div className={styles.headerActions}>
             <Link className={styles.appLinkButton} to="/">
-              일반 화면
+              {t.auth.normalView}
             </Link>
             <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
-              로그아웃
+              {t.auth.signOut}
             </button>
           </div>
         </div>
       </header>
 
       <main className={styles.main}>
-        <ProjectStorageCard usedMb={totalUsedMb} totalMb={totalLimitMb} />
+        <ProjectStorageCard usedMb={totalUsedMb} totalMb={totalLimitMb} labels={t.admin} />
 
         <section className={styles.panel}>
           <div className={styles.toolbar}>
             <div>
-              <h1 className={styles.title}>사용자 관리</h1>
-              <p className={styles.subtitle}>{user?.email ?? '관리자 계정'}</p>
+              <h1 className={styles.title}>{t.admin.userManagement}</h1>
+              <p className={styles.subtitle}>{user?.email ?? t.admin.adminAccount}</p>
             </div>
             <div className={styles.inviteRow}>
               <input
@@ -248,7 +254,7 @@ export function AdminPage() {
                 onClick={() => void handleInvite()}
                 disabled={isSaving}
               >
-                사용자 추가
+                {t.admin.addUser}
               </button>
             </div>
           </div>
@@ -259,7 +265,7 @@ export function AdminPage() {
               이 사용량은 데이터베이스가 아니라 사용자가 올린 첨부 파일 기준으로 계산됩니다.
             </p>
           ) : null}
-          {isLoading ? <p className={styles.helperText}>허용 사용자 목록을 불러오는 중입니다...</p> : null}
+          {isLoading ? <p className={styles.helperText}>{t.admin.loading}</p> : null}
 
           {!isLoading ? (
             <table className={styles.table}>
@@ -285,7 +291,7 @@ export function AdminPage() {
                         onClick={() => void toggleRole(entry)}
                         disabled={isSaving || entry.email === currentEmail}
                       >
-                        {entry.role === 'admin' ? '관리자' : '일반'}
+                        {entry.role === 'admin' ? t.admin.admin : t.admin.member}
                       </button>
                     </td>
                     <td>
@@ -296,7 +302,7 @@ export function AdminPage() {
                         disabled={isSaving || entry.email === currentEmail}
                       >
                         <span className={styles.statusDot} />
-                        {entry.active ? '활성' : '비활성'}
+                        {entry.active ? t.admin.active : t.admin.inactive}
                       </button>
                     </td>
                     <td>
@@ -309,7 +315,7 @@ export function AdminPage() {
                         onClick={() => void toggleRole(entry)}
                         disabled={isSaving || entry.email === currentEmail}
                       >
-                        {entry.role === 'admin' ? '일반으로 변경' : '관리자로 변경'}
+                        {entry.role === 'admin' ? t.admin.changeToMember : t.admin.changeToAdmin}
                       </button>
                       {isSuperAdmin ? (
                         <button

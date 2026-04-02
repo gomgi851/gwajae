@@ -1,16 +1,18 @@
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { useI18n } from '../../i18n/useI18n'
 import { TopTabs } from '../common/TopTabs'
 import { UserWorkspaceProvider } from './UserWorkspaceProvider'
 import styles from './UserShell.module.css'
 
-const userTabs = [
-  { label: '홈', to: '/' },
-  { label: '과제 관리', to: '/assignments' },
-]
-
 export function UserShell() {
   const { user, isAdmin, signOut } = useAuth()
+  const { t } = useI18n()
+
+  const userTabs = [
+    { label: t.tabs.home, to: '/' },
+    { label: t.tabs.assignments, to: '/assignments' },
+  ]
 
   return (
     <div className={styles.page}>
@@ -21,11 +23,11 @@ export function UserShell() {
             <span className={styles.accountEmail}>{user?.email}</span>
             {isAdmin ? (
               <a className={styles.adminLink} href="/admin">
-                관리자 공간
+                {t.auth.adminSpace}
               </a>
             ) : null}
             <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
-              로그아웃
+              {t.auth.signOut}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useI18n } from '../../i18n/useI18n'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
 import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
@@ -112,6 +113,7 @@ export function NewAssignmentModal({
   createAssignment,
   updateAssignment,
 }: NewAssignmentModalProps) {
+  const { t } = useI18n()
   const isEditMode = Boolean(assignment)
   const initialDateParts = getLocalDateParts(assignment?.dueDate)
 
@@ -176,7 +178,7 @@ export function NewAssignmentModal({
     const dueDate = buildIsoDate(dateValue, hourValue, minuteValue, meridiem)
 
     if (!title.trim() || !dueDate || !resolvedSubjectId) {
-      setError('과목, 과제명, 마감일시는 필수입니다.')
+      setError(t.modal.requiredFields)
       return
     }
 
@@ -231,7 +233,7 @@ export function NewAssignmentModal({
         <header className={styles.header}>
           <div className={styles.headingBlock}>
             <h2 id="assignment-modal-title" className={styles.title}>
-              {isEditMode ? '과제 수정' : '새 과제 등록'}
+              {isEditMode ? t.modal.editTitle : t.modal.createTitle}
             </h2>
             <p className={styles.subtitle}>기본 정보와 첨부 파일을 한 번에 정리할 수 있어요.</p>
           </div>
@@ -277,7 +279,7 @@ export function NewAssignmentModal({
               </span>
               <input
                 type="text"
-                placeholder="예: 발표 자료 정리"
+                placeholder={t.modal.assignmentNamePlaceholder}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -365,7 +367,7 @@ export function NewAssignmentModal({
                 <span className={styles.characterCount}>({description.length}/{DESCRIPTION_MAX_LENGTH})</span>
               </span>
               <textarea
-                placeholder="과제에 대한 메모를 적어 두세요."
+                placeholder={t.modal.descriptionPlaceholder}
                 rows={4}
                 maxLength={DESCRIPTION_MAX_LENGTH}
                 value={description}
@@ -467,7 +469,7 @@ export function NewAssignmentModal({
               </div>
 
               {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
-                <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
+                <p className={styles.emptyText}>{t.modal.noNewFiles}</p>
               ) : (
                 <ul className={styles.assetList}>
                   {imageFiles.map((file, index) => (
@@ -484,7 +486,7 @@ export function NewAssignmentModal({
                         className={styles.deleteChip}
                         onClick={() => removeNewImage(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -500,7 +502,7 @@ export function NewAssignmentModal({
                         className={styles.deleteChip}
                         onClick={() => removeNewAttachment(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -526,7 +528,7 @@ export function NewAssignmentModal({
           <div className={styles.footerButtons}>
             {error ? <p className={styles.errorText}>{error}</p> : null}
             <button className={styles.cancelButton} type="button" onClick={onClose}>
-              취소
+              {t.modal.cancel}
             </button>
             <button
               className={styles.saveButton}
