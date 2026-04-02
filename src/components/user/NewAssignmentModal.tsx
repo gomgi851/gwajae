@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n } from '../../i18n/useI18n'
+import { recognizeImage, parseAssignmentText } from '../../lib/ocrParser'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
 import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
@@ -44,6 +45,15 @@ function splitAssets(assets: AssignmentAsset[] | undefined) {
   }
 }
 
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 3500)
+    return () => clearTimeout(timer)
+  }, [onDone])
+
+  return <div className={styles.toast}>{message}</div>
+}
+
 export function NewAssignmentModal({
   assignment,
   onClose,
@@ -66,6 +76,10 @@ export function NewAssignmentModal({
   const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [isScanning, setIsScanning] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   const resolvedSubjectId = subjectId || subjects[0]?.id || ''
   const { images: existingImages, files: existingFiles } = useMemo(
@@ -102,6 +116,45 @@ export function NewAssignmentModal({
 
   function markExistingAssetRemoved(assetId: string) {
     setRemovedAssetIds((currentIds) => [...new Set([...currentIds, assetId])])
+  }
+
+  const handleDismissToast = useCallback(() => setToastMessage(null), [])
+
+  async function handleScreenshotScan(file: File) {
+    setIsScanning(true)
+    setError(null)
+
+    try {
+      const ocrText = await recognizeImage(file)
+      const parsed = parseAssignmentText(ocrText)
+
+      const hasAnyData = parsed.title || parsed.dueDate || parsed.description || parsed.externalLink
+      if (!hasAnyData) {
+        setToastMessage(t.modal.scanNoData)
+        setIsScanning(false)
+        return
+      }
+
+      if (parsed.title) setTitle(parsed.title)
+      if (parsed.dueDate) setDueDate(parsed.dueDate)
+      if (parsed.description) setDescription(parsed.description)
+      if (parsed.externalLink) setExternalLink(parsed.externalLink)
+
+      setToastMessage(t.modal.scanSuccess)
+    } catch {
+      setToastMessage(t.modal.scanFailed)
+    } finally {
+      setIsScanning(false)
+      if (scanInputRef.current) {
+        scanInputRef.current.value = ''
+      }
+    }
+  }
+
+  function onScanFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    void handleScreenshotScan(file)
   }
 
   async function handleSubmit() {
@@ -161,9 +214,26 @@ export function NewAssignmentModal({
             </h2>
             <p className={styles.subtitle}>{t.modal.subtitle}</p>
           </div>
-          <button className={styles.closeButton} onClick={onClose} aria-label={t.modal.close}>
-            ×
-          </button>
+          <div className={styles.headerActions}>
+            {!isEditMode ? (
+              <label className={`${styles.scanButton} ${isScanning ? styles.scanButtonBusy : ''}`}>
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={styles.scanIcon}>
+                  <path d="M4 4h3V2H3a1 1 0 00-1 1v4h2V4zm13-2h-4v2h3v3h2V3a1 1 0 00-1-1zM4 13H2v4a1 1 0 001 1h4v-2H4v-3zm14 0h-2v3h-3v2h4a1 1 0 001-1v-4zM6 6h8v8H6V6z" />
+                </svg>
+                {isScanning ? t.modal.scanning : t.modal.scanScreenshot}
+                <input
+                  ref={scanInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={onScanFileChange}
+                  disabled={isScanning}
+                />
+              </label>
+            ) : null}
+            <button className={styles.closeButton} onClick={onClose} aria-label={t.modal.close}>
+              ×
+            </button>
+          </div>
         </header>
 
         <div className={styles.body}>
@@ -392,6 +462,8 @@ export function NewAssignmentModal({
             </button>
           </div>
         </footer>
+
+        {toastMessage ? <Toast message={toastMessage} onDone={handleDismissToast} /> : null}
       </section>
     </div>
   )
