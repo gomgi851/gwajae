@@ -115,7 +115,9 @@ export async function deleteAllowedUser(id: string) {
     return { error: null }
   }
 
-  return supabase.rpc('purge_allowed_user', {
-    p_allowed_user_id: id,
+  return supabase.functions.invoke('purge-user', {
+    body: {
+      allowedUserId: id,
+    },
   })
 }
