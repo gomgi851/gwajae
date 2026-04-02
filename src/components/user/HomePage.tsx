@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
+import { toggleAssignmentFlags } from '../../lib/assignments'
 import type { Assignment } from '../../types'
 import { PinIcon } from '../common/ActionIcons'
 import { useUserWorkspace } from './useUserWorkspace'
@@ -10,43 +11,36 @@ function bytesToMegabytes(bytes: number) {
   return Math.round((bytes / (1024 * 1024)) * 10) / 10
 }
 
-function UsageCard({ used, total }: { used: number; total: number }) {
+function UsageCard({ title, used, total, circular = false }: {
+  title: string
+  used: number
+  total: number
+  circular?: boolean
+}) {
   const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 
   return (
     <section className={styles.card}>
-      <h2 className={styles.cardTitle}>내 저장공간</h2>
-      <div
-        className={styles.progressRing}
-        style={
-          {
-            '--progress-angle': `${percentage * 3.6}deg`,
-          } as CSSProperties
-        }
-      >
-        <div className={styles.progressInner}>
-          <strong>{percentage}%</strong>
-          <span>사용 중</span>
+      <h2 className={styles.cardTitle}>{title}</h2>
+      {circular ? (
+        <div
+          className={styles.progressRing}
+          style={{ '--progress-angle': `${percentage * 3.6}deg` } as CSSProperties}
+        >
+          <div className={styles.progressInner}>
+            <strong>{percentage}%</strong>
+            <span>사용 중</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className={styles.barTrack}>
+          <div className={styles.barFill} style={{ width: `${percentage}%` }} aria-hidden="true" />
+        </div>
+      )}
       <p className={styles.usageLabel}>
-        {bytesToMegabytes(used)}MB / {bytesToMegabytes(total)}MB 사용 중
-      </p>
-    </section>
-  )
-}
-
-function TotalUsageCard({ used, total }: { used: number; total: number }) {
-  const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-
-  return (
-    <section className={styles.card}>
-      <h2 className={styles.cardTitle}>전체 저장공간</h2>
-      <div className={styles.barTrack}>
-        <div className={styles.barFill} style={{ width: `${percentage}%` }} aria-hidden="true" />
-      </div>
-      <p className={styles.usageLabel}>
-        전체 {bytesToMegabytes(used)}MB / {Math.round(total / (1024 * 1024 * 1024))}GB 사용 중
+        {circular
+          ? `${bytesToMegabytes(used)}MB / ${bytesToMegabytes(total)}MB 사용 중`
+          : `전체 ${bytesToMegabytes(used)}MB / ${Math.round(total / (1024 * 1024 * 1024))}GB 사용 중`}
       </p>
     </section>
   )
@@ -72,7 +66,43 @@ function sortAssignments(assignments: Assignment[]) {
   })
 }
 
-function DeadlineRow({ assignment }: { assignment: Assignment }) {
+function SubmittedToggle({
+  assignment,
+  disabled,
+  onToggle,
+}: {
+  assignment: Assignment
+  disabled: boolean
+  onToggle: (assignment: Assignment) => Promise<void>
+}) {
+  return (
+    <button
+      type="button"
+      className={styles.statusButton}
+      onClick={() => void onToggle(assignment)}
+      disabled={disabled}
+      aria-label={assignment.submitted ? '미제출로 변경' : '제출 완료로 변경'}
+    >
+      <span
+        className={
+          assignment.submitted ? `${styles.statusCircle} ${styles.statusDone}` : styles.statusCircle
+        }
+      >
+        {assignment.submitted ? '✓' : ''}
+      </span>
+    </button>
+  )
+}
+
+function DeadlineRow({
+  assignment,
+  disabled,
+  onToggleSubmitted,
+}: {
+  assignment: Assignment
+  disabled: boolean
+  onToggleSubmitted: (assignment: Assignment) => Promise<void>
+}) {
   return (
     <li className={styles.listRow}>
       <div className={styles.rowMeta}>
@@ -87,13 +117,7 @@ function DeadlineRow({ assignment }: { assignment: Assignment }) {
           <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
         </div>
       </div>
-      {assignment.isFavorite ? (
-        <span className={`${styles.star} ${styles.starActive}`} aria-label="고정됨">
-          <PinIcon />
-        </span>
-      ) : (
-        <button className={styles.rowButton} aria-label={`${assignment.title} 상태`} />
-      )}
+      <SubmittedToggle assignment={assignment} disabled={disabled} onToggle={onToggleSubmitted} />
     </li>
   )
 }
@@ -113,7 +137,7 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
           <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
         </div>
       </div>
-      <span className={`${styles.star} ${styles.starActive}`} aria-label="고정됨">
+      <span className={`${styles.pinBadge} ${styles.pinBadgeActive}`} aria-label="고정된 과제">
         <PinIcon />
       </span>
     </li>
@@ -122,7 +146,9 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
 
 export function HomePage() {
   const { isAdmin } = useAuth()
-  const { assignments, storageSummary, isLoading, dataError, storageError } = useUserWorkspace()
+  const { assignments, storageSummary, isLoading, dataError, storageError, refreshAll } =
+    useUserWorkspace()
+  const [isSaving, setIsSaving] = useState(false)
 
   const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
   const favoriteAssignments = useMemo(
@@ -131,16 +157,38 @@ export function HomePage() {
   )
   const upcomingAssignments = useMemo(() => sortedAssignments.slice(0, 3), [sortedAssignments])
 
+  async function handleToggleSubmitted(assignment: Assignment) {
+    setIsSaving(true)
+    const { error } = await toggleAssignmentFlags(assignment.id, {
+      submitted: !assignment.submitted,
+    })
+    setIsSaving(false)
+
+    if (!error) {
+      await refreshAll()
+    }
+  }
+
   return (
     <div className={styles.grid}>
       <div className={styles.leftColumn}>
-        <UsageCard used={storageSummary.personalBytes} total={storageSummary.personalLimitBytes} />
+        <UsageCard
+          title="내 저장공간"
+          used={storageSummary.personalBytes}
+          total={storageSummary.personalLimitBytes}
+          circular
+        />
         {isAdmin ? (
-          <TotalUsageCard used={storageSummary.totalBytes} total={storageSummary.totalLimitBytes} />
+          <UsageCard
+            title="전체 저장공간"
+            used={storageSummary.totalBytes}
+            total={storageSummary.totalLimitBytes}
+          />
         ) : null}
         {storageError ? (
           <p className={styles.helperText}>
-            저장공간 수치는 첨부파일 메타데이터 기준으로 계산됩니다. 최신 SQL과 업로드 데이터가 반영되어야 정확합니다.
+            저장공간 수치는 첨부 파일 메타데이터 기준으로 계산됩니다. 최신 업로드가 반영되기까지
+            잠시 걸릴 수 있습니다.
           </p>
         ) : null}
       </div>
@@ -153,12 +201,17 @@ export function HomePage() {
           <ul className={styles.list}>
             {upcomingAssignments.length > 0 ? (
               upcomingAssignments.map((assignment) => (
-                <DeadlineRow key={assignment.id} assignment={assignment} />
+                <DeadlineRow
+                  key={assignment.id}
+                  assignment={assignment}
+                  disabled={isSaving}
+                  onToggleSubmitted={handleToggleSubmitted}
+                />
               ))
             ) : (
               <li className={styles.listRow}>
                 <p className={styles.assignmentDetail}>
-                  아직 등록한 과제가 없습니다. 과제 관리 탭에서 첫 과제를 추가해 보세요.
+                  아직 등록된 과제가 없습니다. 과제 관리 탭에서 첫 과제를 추가해 보세요.
                 </p>
               </li>
             )}
@@ -177,7 +230,7 @@ export function HomePage() {
             ) : (
               <li className={styles.listRow}>
                 <p className={styles.assignmentDetail}>
-                  핀 버튼을 누른 과제는 여기서 빠르게 다시 볼 수 있습니다.
+                  핀 버튼을 누른 과제가 이 카드의 맨 위에 고정되어 표시됩니다.
                 </p>
               </li>
             )}

@@ -5,7 +5,7 @@
     0 18px 42px rgba(138, 152, 171, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(18px);
-  padding: 1.1rem 1.2rem 0.8rem;
+  padding: 1.1rem 1rem 0.8rem;
 }
 
 .toolbar {
@@ -88,22 +88,47 @@
 }
 
 .tableWrapper {
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .table {
   width: 100%;
-  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #8ea0b0;
   font-size: 0.84rem;
 }
 
+.colPin {
+  width: 6%;
+}
+
+.colSubject {
+  width: 14%;
+}
+
+.colTitle {
+  width: 26%;
+}
+
+.colDueDate {
+  width: 20%;
+}
+
+.colSubmitted,
+.colLink,
+.colFiles,
+.colEdit,
+.colDelete {
+  width: 6.8%;
+}
+
 .table th,
 .table td {
-  padding: 1rem 0.7rem;
+  padding: 1rem 0.55rem;
   border-top: 1px solid rgba(147, 163, 178, 0.12);
   text-align: left;
+  vertical-align: middle;
 }
 
 .table thead th {
@@ -119,31 +144,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 4.2rem;
-  padding: 0.22rem 0.58rem;
+  width: 100%;
+  max-width: 6rem;
+  padding: 0.26rem 0.58rem;
   border-radius: 999px;
   color: #58718a;
   font-size: 0.69rem;
   font-weight: 700;
+  box-sizing: border-box;
 }
 
 .titleCell {
-  min-width: 12rem;
   color: #58718a;
   font-weight: 700;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.dateCell {
+  line-height: 1.5;
+  word-break: keep-all;
 }
 
 .statusButton {
   border: none;
   background: transparent;
   padding: 0;
+  cursor: pointer;
 }
 
 .statusCircle {
   display: inline-grid;
   place-items: center;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.28rem;
+  height: 1.28rem;
   border: 1.5px solid #8ea4b8;
   border-radius: 50%;
   color: transparent;
@@ -181,8 +215,8 @@
 
 .pinIcon,
 .editIcon {
-  width: 1.28rem;
-  height: 1.28rem;
+  width: 1.42rem;
+  height: 1.42rem;
 }
 
 .filesCell {
@@ -201,6 +235,11 @@
   color: #58718a;
   font-weight: 700;
   text-decoration: none;
+}
+
+.helperInline {
+  color: #8ea0b0;
+  font-weight: 600;
 }
 
 .helperText,
@@ -350,5 +389,13 @@
   .selectShell select {
     min-width: 0;
     width: 100%;
+  }
+
+  .tableWrapper {
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 44rem;
   }
 }

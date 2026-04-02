@@ -117,7 +117,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
           <span>과목명</span>
           <input
             type="text"
-            placeholder="예: 선형대수"
+            placeholder="예: 자료구조"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -159,7 +159,8 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
 }
 
 export function AssignmentsPage() {
-  const { assignments, subjects, storageSummary, isLoading, dataError, refreshAll } = useUserWorkspace()
+  const { assignments, subjects, storageSummary, isLoading, dataError, refreshAll } =
+    useUserWorkspace()
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
@@ -300,6 +301,17 @@ export function AssignmentsPage() {
 
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
+            <colgroup>
+              <col className={styles.colPin} />
+              <col className={styles.colSubject} />
+              <col className={styles.colTitle} />
+              <col className={styles.colDueDate} />
+              <col className={styles.colSubmitted} />
+              <col className={styles.colLink} />
+              <col className={styles.colFiles} />
+              <col className={styles.colEdit} />
+              <col className={styles.colDelete} />
+            </colgroup>
             <thead>
               <tr>
                 <th>고정</th>
@@ -332,7 +344,7 @@ export function AssignmentsPage() {
                       }
                       onClick={() => void handleToggleFavorite(assignment)}
                       disabled={isSaving}
-                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위에 고정'}
+                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위로 고정'}
                     >
                       <PinIcon className={styles.pinIcon} />
                     </button>
@@ -346,7 +358,7 @@ export function AssignmentsPage() {
                     </span>
                   </td>
                   <td className={styles.titleCell}>{assignment.title}</td>
-                  <td>{formatDueDate(assignment.dueDate)}</td>
+                  <td className={styles.dateCell}>{formatDueDate(assignment.dueDate)}</td>
                   <td>
                     <SubmittedToggle
                       assignment={assignment}
@@ -362,10 +374,10 @@ export function AssignmentsPage() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        열기
+                        있음
                       </a>
                     ) : (
-                      <span className={styles.helperText}>없음</span>
+                      <span className={styles.helperInline}>없음</span>
                     )}
                   </td>
                   <td className={styles.filesCell}>{assignment.attachmentCount}개</td>
