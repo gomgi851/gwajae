@@ -44,6 +44,10 @@ function sortAssignments(assignments: Assignment[]) {
   })
 }
 
+function getAssignmentRowClassName(assignment: Assignment) {
+  return assignment.submitted ? styles.submittedRow : undefined
+}
+
 function SubmittedToggle({
   assignment,
   onToggle,
@@ -335,7 +339,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {filteredAssignments.map((assignment) => (
-                <tr key={assignment.id}>
+                <tr key={assignment.id} className={getAssignmentRowClassName(assignment)}>
                   <td>
                     <button
                       type="button"
@@ -351,14 +355,27 @@ export function AssignmentsPage() {
                   </td>
                   <td>
                     <span
-                      className={styles.subjectPill}
+                      className={
+                        assignment.submitted
+                          ? `${styles.subjectPill} ${styles.submittedSubjectPill}`
+                          : styles.subjectPill
+                      }
                       style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
                     >
                       {assignment.subjectName ?? '미지정'}
                     </span>
                   </td>
-                  <td className={styles.titleCell}>{assignment.title}</td>
-                  <td className={styles.dateCell}>{formatDueDate(assignment.dueDate)}</td>
+                  <td className={assignment.submitted ? styles.titleCellSubmitted : styles.titleCell}>
+                    <div className={styles.titleStack}>
+                      <span>{assignment.title}</span>
+                      {assignment.submitted ? (
+                        <span className={styles.submittedBadge}>제출 완료</span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className={assignment.submitted ? styles.dateCellSubmitted : styles.dateCell}>
+                    {formatDueDate(assignment.dueDate)}
+                  </td>
                   <td>
                     <SubmittedToggle
                       assignment={assignment}
@@ -369,7 +386,11 @@ export function AssignmentsPage() {
                   <td>
                     {assignment.externalLink ? (
                       <a
-                        className={styles.linkAnchor}
+                        className={
+                          assignment.submitted
+                            ? `${styles.linkAnchor} ${styles.submittedInlineText}`
+                            : styles.linkAnchor
+                        }
                         href={assignment.externalLink}
                         target="_blank"
                         rel="noreferrer"
@@ -377,10 +398,26 @@ export function AssignmentsPage() {
                         있음
                       </a>
                     ) : (
-                      <span className={styles.helperInline}>없음</span>
+                      <span
+                        className={
+                          assignment.submitted
+                            ? `${styles.helperInline} ${styles.submittedInlineText}`
+                            : styles.helperInline
+                        }
+                      >
+                        없음
+                      </span>
                     )}
                   </td>
-                  <td className={styles.filesCell}>{assignment.attachmentCount}개</td>
+                  <td
+                    className={
+                      assignment.submitted
+                        ? `${styles.filesCell} ${styles.submittedInlineText}`
+                        : styles.filesCell
+                    }
+                  >
+                    {assignment.attachmentCount}개
+                  </td>
                   <td>
                     <button
                       type="button"
