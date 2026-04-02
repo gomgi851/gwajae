@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
+import { DownloadIcon } from '../common/ActionIcons'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
-import type { AssignmentFormInput } from '../../lib/assignments'
+import { getAssignmentAssetDownloadUrl, type AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
 
 type ActiveTab = 'info' | 'attachments'
@@ -131,6 +132,7 @@ export function NewAssignmentModal({
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
   const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const resolvedSubjectId = subjectId || subjects[0]?.id || ''
@@ -170,6 +172,21 @@ export function NewAssignmentModal({
 
   function markExistingAssetRemoved(assetId: string) {
     setRemovedAssetIds((currentIds) => [...new Set([...currentIds, assetId])])
+  }
+
+  async function handleDownloadAsset(asset: AssignmentAsset) {
+    setDownloadingAssetId(asset.id)
+
+    const { data, error: downloadError } = await getAssignmentAssetDownloadUrl(asset)
+
+    if (downloadError || !data) {
+      setError(downloadError?.message ?? '첨부 파일 다운로드 링크를 불러오지 못했습니다.')
+      setDownloadingAssetId(null)
+      return
+    }
+
+    window.open(data, '_blank', 'noopener,noreferrer')
+    setDownloadingAssetId(null)
   }
 
   async function handleSubmit() {
@@ -409,13 +426,24 @@ export function NewAssignmentModal({
                       <span className={styles.assetName}>{asset.fileName}</span>
                       <span className={styles.assetMeta}>{getAssetSummaryLabel(asset)}</span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.deleteChip}
-                      onClick={() => markExistingAssetRemoved(asset.id)}
-                    >
-                      삭제
-                    </button>
+                    <div className={styles.assetActions}>
+                      <button
+                        type="button"
+                        className={styles.downloadChip}
+                        onClick={() => void handleDownloadAsset(asset)}
+                        disabled={downloadingAssetId === asset.id}
+                        aria-label={`${asset.fileName} 다운로드`}
+                      >
+                        <DownloadIcon className={styles.downloadIcon} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteChip}
+                        onClick={() => markExistingAssetRemoved(asset.id)}
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </li>
                 ))}
                 {visibleExistingFiles.map((asset) => (
@@ -425,13 +453,24 @@ export function NewAssignmentModal({
                       <span className={styles.assetName}>{asset.fileName}</span>
                       <span className={styles.assetMeta}>{getAssetSummaryLabel(asset)}</span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.deleteChip}
-                      onClick={() => markExistingAssetRemoved(asset.id)}
-                    >
-                      삭제
-                    </button>
+                    <div className={styles.assetActions}>
+                      <button
+                        type="button"
+                        className={styles.downloadChip}
+                        onClick={() => void handleDownloadAsset(asset)}
+                        disabled={downloadingAssetId === asset.id}
+                        aria-label={`${asset.fileName} 다운로드`}
+                      >
+                        <DownloadIcon className={styles.downloadIcon} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteChip}
+                        onClick={() => markExistingAssetRemoved(asset.id)}
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

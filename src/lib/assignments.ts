@@ -217,6 +217,21 @@ async function uploadAssets(
   return { error }
 }
 
+export async function getAssignmentAssetDownloadUrl(asset: AssignmentAsset) {
+  if (!supabase) {
+    return { data: null as string | null, error: null }
+  }
+
+  const { data, error } = await supabase.storage
+    .from(ASSIGNMENT_BUCKET)
+    .createSignedUrl(asset.storagePath, 60, { download: asset.fileName })
+
+  return {
+    data: data?.signedUrl ?? null,
+    error,
+  }
+}
+
 export async function fetchAssignments() {
   if (!supabase) {
     return { data: [] as Assignment[], error: null }
