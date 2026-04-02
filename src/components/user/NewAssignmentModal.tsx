@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useI18n } from '../../i18n/useI18n'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
 import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
@@ -52,6 +53,7 @@ export function NewAssignmentModal({
   createAssignment,
   updateAssignment,
 }: NewAssignmentModalProps) {
+  const { t } = useI18n()
   const isEditMode = Boolean(assignment)
   const [title, setTitle] = useState(assignment?.title ?? '')
   const [subjectId, setSubjectId] = useState(assignment?.subjectId ?? subjects[0]?.id ?? '')
@@ -104,14 +106,12 @@ export function NewAssignmentModal({
 
   async function handleSubmit() {
     if (!title.trim() || !dueDate || !resolvedSubjectId) {
-      setError('과목, 과제명, 마감일시는 필수입니다.')
+      setError(t.modal.requiredFields)
       return
     }
 
     if (selectedBytes > remainingBytes) {
-      setError(
-        `선택한 파일 용량이 남은 저장공간을 초과했습니다. 남은 용량은 ${bytesToMegabytes(remainingBytes)}MB입니다.`,
-      )
+      setError(t.modal.storageFull.replace('{amount}', String(bytesToMegabytes(remainingBytes))))
       return
     }
 
@@ -157,26 +157,24 @@ export function NewAssignmentModal({
         <header className={styles.header}>
           <div>
             <h2 id="assignment-modal-title" className={styles.title}>
-              {isEditMode ? '과제 수정' : '새 과제 등록'}
+              {isEditMode ? t.modal.editTitle : t.modal.createTitle}
             </h2>
-            <p className={styles.subtitle}>
-              기본 정보와 첨부 파일을 한 번에 정리할 수 있어요.
-            </p>
+            <p className={styles.subtitle}>{t.modal.subtitle}</p>
           </div>
-          <button className={styles.closeButton} onClick={onClose} aria-label="모달 닫기">
+          <button className={styles.closeButton} onClick={onClose} aria-label={t.modal.close}>
             ×
           </button>
         </header>
 
         <div className={styles.body}>
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>기본 정보</h3>
+            <h3 className={styles.sectionTitle}>{t.modal.basicInfo}</h3>
 
             <label className={styles.field}>
-              <span>과제명 *</span>
+              <span>{t.modal.assignmentName}</span>
               <input
                 type="text"
-                placeholder="예: 발표 자료 정리"
+                placeholder={t.modal.assignmentNamePlaceholder}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -184,7 +182,7 @@ export function NewAssignmentModal({
 
             <div className={styles.fieldRow}>
               <label className={styles.field}>
-                <span>과목 *</span>
+                <span>{t.modal.subject}</span>
                 <select
                   value={resolvedSubjectId}
                   onChange={(event) => setSubjectId(event.target.value)}
@@ -198,7 +196,7 @@ export function NewAssignmentModal({
               </label>
 
               <label className={styles.field}>
-                <span>마감일시 *</span>
+                <span>{t.modal.dueDate}</span>
                 <input
                   type="datetime-local"
                   value={dueDate}
@@ -208,9 +206,9 @@ export function NewAssignmentModal({
             </div>
 
             <label className={styles.field}>
-              <span>설명</span>
+              <span>{t.modal.description}</span>
               <textarea
-                placeholder="과제에 대한 메모를 적어 두세요."
+                placeholder={t.modal.descriptionPlaceholder}
                 rows={4}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -218,7 +216,7 @@ export function NewAssignmentModal({
             </label>
 
             <label className={styles.field}>
-              <span>외부 링크</span>
+              <span>{t.modal.externalLink}</span>
               <input
                 type="url"
                 placeholder="https://..."
@@ -229,18 +227,18 @@ export function NewAssignmentModal({
           </section>
 
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>첨부 관리</h3>
+            <h3 className={styles.sectionTitle}>{t.modal.attachments}</h3>
 
             <div className={styles.attachmentPanel}>
               <div className={styles.panelHeader}>
-                <span className={styles.panelTitle}>기존 첨부</span>
+                <span className={styles.panelTitle}>{t.modal.existingAttachments}</span>
                 <span className={styles.panelMeta}>
-                  이미지 {visibleExistingImages.length}개 / 파일 {visibleExistingFiles.length}개
+                  {t.modal.imageCount.replace('{count}', String(visibleExistingImages.length))} / {t.modal.fileCount.replace('{count}', String(visibleExistingFiles.length))}
                 </span>
               </div>
 
               {visibleExistingImages.length === 0 && visibleExistingFiles.length === 0 ? (
-                <p className={styles.emptyText}>아직 첨부된 파일이 없습니다.</p>
+                <p className={styles.emptyText}>{t.modal.noAttachments}</p>
               ) : (
                 <ul className={styles.assetList}>
                   {visibleExistingImages.map((asset) => (
@@ -248,8 +246,8 @@ export function NewAssignmentModal({
                       <div className={styles.assetInfo}>
                         <span className={styles.assetName}>{asset.fileName}</span>
                         <span className={styles.assetMeta}>
-                          이미지 · {bytesToMegabytes(asset.sizeBytes)}MB
-                          {asset.isThumbnail ? ' · 썸네일' : ''}
+                          {t.modal.image} · {bytesToMegabytes(asset.sizeBytes)}MB
+                          {asset.isThumbnail ? ` · ${t.modal.thumbnail}` : ''}
                         </span>
                       </div>
                       <button
@@ -257,7 +255,7 @@ export function NewAssignmentModal({
                         className={styles.removeChip}
                         onClick={() => markExistingAssetRemoved(asset.id)}
                       >
-                        삭제
+                        {t.modal.removeExisting}
                       </button>
                     </li>
                   ))}
@@ -266,7 +264,7 @@ export function NewAssignmentModal({
                       <div className={styles.assetInfo}>
                         <span className={styles.assetName}>{asset.fileName}</span>
                         <span className={styles.assetMeta}>
-                          파일 · {bytesToMegabytes(asset.sizeBytes)}MB
+                          {t.modal.file} · {bytesToMegabytes(asset.sizeBytes)}MB
                         </span>
                       </div>
                       <button
@@ -274,7 +272,7 @@ export function NewAssignmentModal({
                         className={styles.removeChip}
                         onClick={() => markExistingAssetRemoved(asset.id)}
                       >
-                        삭제
+                        {t.modal.removeExisting}
                       </button>
                     </li>
                   ))}
@@ -284,13 +282,13 @@ export function NewAssignmentModal({
 
             <div className={styles.attachmentPanel}>
               <div className={styles.panelHeader}>
-                <span className={styles.panelTitle}>새 첨부 추가</span>
-                <span className={styles.panelMeta}>이번 저장 때 함께 업로드됩니다.</span>
+                <span className={styles.panelTitle}>{t.modal.newAttachments}</span>
+                <span className={styles.panelMeta}>{t.modal.newAttachmentsNote}</span>
               </div>
 
               <div className={styles.pickerRow}>
                 <label className={styles.filePickerLabel}>
-                  이미지 추가
+                  {t.modal.addImages}
                   <input
                     type="file"
                     accept="image/*"
@@ -301,7 +299,7 @@ export function NewAssignmentModal({
                   />
                 </label>
                 <label className={styles.filePickerLabel}>
-                  파일 추가
+                  {t.modal.addFiles}
                   <input
                     type="file"
                     multiple
@@ -313,7 +311,7 @@ export function NewAssignmentModal({
               </div>
 
               {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
-                <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
+                <p className={styles.emptyText}>{t.modal.noNewFiles}</p>
               ) : (
                 <ul className={styles.assetList}>
                   {imageFiles.map((file, index) => (
@@ -321,8 +319,8 @@ export function NewAssignmentModal({
                       <div className={styles.assetInfo}>
                         <span className={styles.assetName}>{file.name}</span>
                         <span className={styles.assetMeta}>
-                          이미지 · {bytesToMegabytes(file.size)}MB
-                          {index === 0 ? ' · 첫 이미지가 썸네일' : ''}
+                          {t.modal.image} · {bytesToMegabytes(file.size)}MB
+                          {index === 0 ? ` · ${t.modal.firstImageThumbnail}` : ''}
                         </span>
                       </div>
                       <button
@@ -330,7 +328,7 @@ export function NewAssignmentModal({
                         className={styles.removeChip}
                         onClick={() => removeNewImage(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -340,7 +338,7 @@ export function NewAssignmentModal({
                       <div className={styles.assetInfo}>
                         <span className={styles.assetName}>{file.name}</span>
                         <span className={styles.assetMeta}>
-                          파일 · {bytesToMegabytes(file.size)}MB
+                          {t.modal.file} · {bytesToMegabytes(file.size)}MB
                         </span>
                       </div>
                       <button
@@ -348,7 +346,7 @@ export function NewAssignmentModal({
                         className={styles.removeChip}
                         onClick={() => removeNewAttachment(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -366,17 +364,17 @@ export function NewAssignmentModal({
                 checked={submitted}
                 onChange={(event) => setSubmitted(event.target.checked)}
               />
-              <span>제출 완료로 표시</span>
+              <span>{t.modal.markSubmitted}</span>
             </label>
             <p className={styles.helperText}>
-              남은 개인 저장공간 {bytesToMegabytes(remainingAfterSelection)}MB
+              {t.modal.remainingStorage.replace('{amount}', String(bytesToMegabytes(remainingAfterSelection)))}
             </p>
             {error ? <p className={styles.errorText}>{error}</p> : null}
           </div>
 
           <div className={styles.footerActions}>
             <button className={styles.cancelButton} type="button" onClick={onClose}>
-              취소
+              {t.modal.cancel}
             </button>
             <button
               className={styles.submitButton}
@@ -386,11 +384,11 @@ export function NewAssignmentModal({
             >
               {isSubmitting
                 ? isEditMode
-                  ? '수정 중...'
-                  : '등록 중...'
+                  ? t.modal.updating
+                  : t.modal.saving
                 : isEditMode
-                  ? '저장하기'
-                  : '과제 등록'}
+                  ? t.modal.save
+                  : t.modal.create}
             </button>
           </div>
         </footer>
