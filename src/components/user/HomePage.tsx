@@ -59,6 +59,20 @@ function formatDueDetail(dueDate: string) {
   }).format(new Date(dueDate))
 }
 
+function sortAssignments(assignments: Assignment[]) {
+  return [...assignments].sort((left, right) => {
+    if (left.isFavorite !== right.isFavorite) {
+      return Number(right.isFavorite) - Number(left.isFavorite)
+    }
+
+    return new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
+  })
+}
+
+function getHomeAssignmentRowClassName(assignment: Assignment) {
+  return assignment.submitted ? `${styles.assignmentRow} ${styles.submittedRow}` : styles.assignmentRow
+}
+
 function UsageCard({
   title,
   used,
@@ -97,16 +111,6 @@ function UsageCard({
       </p>
     </section>
   )
-}
-
-function sortAssignments(assignments: Assignment[]) {
-  return [...assignments].sort((left, right) => {
-    if (left.isFavorite !== right.isFavorite) {
-      return Number(right.isFavorite) - Number(left.isFavorite)
-    }
-
-    return new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
-  })
 }
 
 function SubmittedToggle({
@@ -167,10 +171,14 @@ function DeadlineRow({
   onToggleSubmitted: (assignment: Assignment) => Promise<void>
 }) {
   return (
-    <li className={styles.assignmentRow}>
+    <li className={getHomeAssignmentRowClassName(assignment)}>
       <div className={styles.subjectCell}>
         <span
-          className={styles.subjectPill}
+          className={
+            assignment.submitted
+              ? `${styles.subjectPill} ${styles.submittedSubjectPill}`
+              : styles.subjectPill
+          }
           style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
         >
           {assignment.subjectName ?? '미지정'}
@@ -178,8 +186,15 @@ function DeadlineRow({
       </div>
 
       <div className={styles.contentCell}>
-        <p className={styles.assignmentName}>{assignment.title}</p>
-        <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
+        <div className={styles.assignmentNameRow}>
+          <p className={assignment.submitted ? styles.assignmentNameSubmitted : styles.assignmentName}>
+            {assignment.title}
+          </p>
+          {assignment.submitted ? <span className={styles.submittedBadge}>제출 완료</span> : null}
+        </div>
+        <p className={assignment.submitted ? styles.assignmentDetailSubmitted : styles.assignmentDetail}>
+          마감 {formatDueDetail(assignment.dueDate)}
+        </p>
       </div>
 
       <div className={styles.ddayCell}>
@@ -197,10 +212,14 @@ function DeadlineRow({
 
 function FavoriteRow({ assignment }: { assignment: Assignment }) {
   return (
-    <li className={styles.assignmentRow}>
+    <li className={getHomeAssignmentRowClassName(assignment)}>
       <div className={styles.subjectCell}>
         <span
-          className={styles.subjectPill}
+          className={
+            assignment.submitted
+              ? `${styles.subjectPill} ${styles.submittedSubjectPill}`
+              : styles.subjectPill
+          }
           style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
         >
           {assignment.subjectName ?? '미지정'}
@@ -208,8 +227,15 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
       </div>
 
       <div className={styles.contentCell}>
-        <p className={styles.assignmentName}>{assignment.title}</p>
-        <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
+        <div className={styles.assignmentNameRow}>
+          <p className={assignment.submitted ? styles.assignmentNameSubmitted : styles.assignmentName}>
+            {assignment.title}
+          </p>
+          {assignment.submitted ? <span className={styles.submittedBadge}>제출 완료</span> : null}
+        </div>
+        <p className={assignment.submitted ? styles.assignmentDetailSubmitted : styles.assignmentDetail}>
+          마감 {formatDueDetail(assignment.dueDate)}
+        </p>
       </div>
 
       <div className={styles.ddayCell}>
@@ -219,7 +245,7 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
       </div>
 
       <div className={styles.actionCell}>
-        <span className={`${styles.pinBadge} ${styles.pinBadgeActive}`} aria-label="고정한 과제">
+        <span className={`${styles.pinBadge} ${styles.pinBadgeActive}`} aria-label="고정된 과제">
           <PinIcon />
         </span>
       </div>
@@ -270,7 +296,7 @@ export function HomePage() {
         ) : null}
         {storageError ? (
           <p className={styles.helperText}>
-            저장공간 수치는 첨부 파일 메타데이터 기준으로 계산됩니다. 최신 업로드가 반영되기까지
+            저장공간 수치는 첨부 파일 메타데이터 기준으로 계산합니다. 최신 업로드가 반영되기까지
             잠시 걸릴 수 있습니다.
           </p>
         ) : null}
@@ -315,7 +341,7 @@ export function HomePage() {
             ) : (
               <li className={styles.emptyRow}>
                 <p className={styles.assignmentDetail}>
-                  핀 버튼을 누른 과제가 이 카드의 맨 위에 고정되어 표시됩니다.
+                  핀 버튼을 누른 과제가 이 카드 상단에 고정되어 표시됩니다.
                 </p>
               </li>
             )}
