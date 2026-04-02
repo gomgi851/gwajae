@@ -1,10 +1,14 @@
 import type { CSSProperties } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAuth } from '../../auth/useAuth'
-import { fetchAssignments } from '../../lib/assignments'
-import { useStorageUsage } from '../../hooks/useStorageUsage'
 import type { Assignment } from '../../types'
+import { PinIcon } from '../common/ActionIcons'
+import { useUserWorkspace } from './useUserWorkspace'
 import styles from './HomePage.module.css'
+
+function bytesToMegabytes(bytes: number) {
+  return Math.round((bytes / (1024 * 1024)) * 10) / 10
+}
 
 function UsageCard({ used, total }: { used: number; total: number }) {
   const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
@@ -26,14 +30,14 @@ function UsageCard({ used, total }: { used: number; total: number }) {
         </div>
       </div>
       <p className={styles.usageLabel}>
-        {used}MB / {total}MB 사용 중
+        {bytesToMegabytes(used)}MB / {bytesToMegabytes(total)}MB 사용 중
       </p>
     </section>
   )
 }
 
-function TotalUsageCard({ used, totalMb }: { used: number; totalMb: number }) {
-  const percentage = totalMb > 0 ? Math.min(100, Math.round((used / totalMb) * 100)) : 0
+function TotalUsageCard({ used, total }: { used: number; total: number }) {
+  const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 
   return (
     <section className={styles.card}>
@@ -42,20 +46,30 @@ function TotalUsageCard({ used, totalMb }: { used: number; totalMb: number }) {
         <div className={styles.barFill} style={{ width: `${percentage}%` }} aria-hidden="true" />
       </div>
       <p className={styles.usageLabel}>
-        전체 {used}MB / {totalMb / 1024}GB 사용 중
+        전체 {bytesToMegabytes(used)}MB / {Math.round(total / (1024 * 1024 * 1024))}GB 사용 중
       </p>
     </section>
   )
 }
 
 function formatDueDetail(dueDate: string) {
-  const date = new Date(dueDate)
-  const label = new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
     day: 'numeric',
-  }).format(date)
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(dueDate))
+}
 
-  return `마감 ${label}`
+function sortAssignments(assignments: Assignment[]) {
+  return [...assignments].sort((left, right) => {
+    if (left.isFavorite !== right.isFavorite) {
+      return Number(right.isFavorite) - Number(left.isFavorite)
+    }
+
+    return new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
+  })
 }
 
 function DeadlineRow({ assignment }: { assignment: Assignment }) {
@@ -70,10 +84,16 @@ function DeadlineRow({ assignment }: { assignment: Assignment }) {
         </span>
         <div>
           <p className={styles.assignmentName}>{assignment.title}</p>
-          <p className={styles.assignmentDetail}>{formatDueDetail(assignment.dueDate)}</p>
+          <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
         </div>
       </div>
-      <button className={styles.rowButton} aria-label={`${assignment.title} 상태`} />
+      {assignment.isFavorite ? (
+        <span className={`${styles.star} ${styles.starActive}`} aria-label="고정됨">
+          <PinIcon />
+        </span>
+      ) : (
+        <button className={styles.rowButton} aria-label={`${assignment.title} 상태`} />
+      )}
     </li>
   )
 }
@@ -90,70 +110,46 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
         </span>
         <div>
           <p className={styles.assignmentName}>{assignment.title}</p>
-          <p className={styles.assignmentDetail}>{formatDueDetail(assignment.dueDate)}</p>
+          <p className={styles.assignmentDetail}>마감 {formatDueDetail(assignment.dueDate)}</p>
         </div>
       </div>
-      <button className={`${styles.star} ${styles.starActive}`} aria-label="즐겨찾기됨">
-        *
-      </button>
+      <span className={`${styles.star} ${styles.starActive}`} aria-label="고정됨">
+        <PinIcon />
+      </span>
     </li>
   )
 }
 
 export function HomePage() {
   const { isAdmin } = useAuth()
-  const { personalUsedMb, personalLimitMb, totalUsedMb, totalLimitMb, error: storageError } =
-    useStorageUsage()
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { assignments, storageSummary, isLoading, dataError, storageError } = useUserWorkspace()
 
-  useEffect(() => {
-    let ignore = false
-
-    async function loadAssignments() {
-      setIsLoading(true)
-      const { data, error: queryError } = await fetchAssignments()
-
-      if (ignore) {
-        return
-      }
-
-      setAssignments(data ?? [])
-      setError(queryError ? queryError.message : null)
-      setIsLoading(false)
-    }
-
-    void loadAssignments()
-
-    return () => {
-      ignore = true
-    }
-  }, [])
-
+  const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
   const favoriteAssignments = useMemo(
-    () => assignments.filter((assignment) => assignment.isFavorite).slice(0, 4),
-    [assignments],
+    () => sortedAssignments.filter((assignment) => assignment.isFavorite).slice(0, 4),
+    [sortedAssignments],
   )
-  const upcomingAssignments = useMemo(() => assignments.slice(0, 3), [assignments])
+  const upcomingAssignments = useMemo(() => sortedAssignments.slice(0, 3), [sortedAssignments])
 
   return (
     <div className={styles.grid}>
       <div className={styles.leftColumn}>
-        <UsageCard used={personalUsedMb} total={personalLimitMb} />
-        {isAdmin ? <TotalUsageCard used={totalUsedMb} totalMb={totalLimitMb} /> : null}
+        <UsageCard used={storageSummary.personalBytes} total={storageSummary.personalLimitBytes} />
+        {isAdmin ? (
+          <TotalUsageCard used={storageSummary.totalBytes} total={storageSummary.totalLimitBytes} />
+        ) : null}
         {storageError ? (
           <p className={styles.helperText}>
-            저장공간 수치는 최신 SQL 설정 이후 업로드된 과제 파일 기준으로 계산됩니다.
+            저장공간 수치는 첨부파일 메타데이터 기준으로 계산됩니다. 최신 SQL과 업로드 데이터가 반영되어야 정확합니다.
           </p>
         ) : null}
       </div>
 
       <section className={`${styles.panel} ${styles.tallPanel}`}>
         <h1 className={styles.panelTitle}>다가오는 마감</h1>
-        {isLoading ? <p className={styles.helperText}>과제를 불러오는 중입니다...</p> : null}
-        {error ? <p className={styles.helperText}>{error}</p> : null}
-        {!isLoading && !error ? (
+        {isLoading ? <p className={styles.helperText}>과제 데이터를 불러오는 중입니다...</p> : null}
+        {dataError ? <p className={styles.helperText}>{dataError}</p> : null}
+        {!isLoading && !dataError ? (
           <ul className={styles.list}>
             {upcomingAssignments.length > 0 ? (
               upcomingAssignments.map((assignment) => (
@@ -162,7 +158,7 @@ export function HomePage() {
             ) : (
               <li className={styles.listRow}>
                 <p className={styles.assignmentDetail}>
-                  아직 등록된 과제가 없습니다. 과제 관리 탭에서 첫 과제를 추가해 보세요.
+                  아직 등록한 과제가 없습니다. 과제 관리 탭에서 첫 과제를 추가해 보세요.
                 </p>
               </li>
             )}
@@ -171,8 +167,8 @@ export function HomePage() {
       </section>
 
       <section className={`${styles.panel} ${styles.bottomPanel}`}>
-        <h1 className={styles.panelTitle}>즐겨찾기</h1>
-        {!isLoading && !error ? (
+        <h1 className={styles.panelTitle}>고정한 과제</h1>
+        {!isLoading && !dataError ? (
           <ul className={styles.list}>
             {favoriteAssignments.length > 0 ? (
               favoriteAssignments.map((assignment) => (
@@ -181,7 +177,7 @@ export function HomePage() {
             ) : (
               <li className={styles.listRow}>
                 <p className={styles.assignmentDetail}>
-                  과제를 즐겨찾기하면 이곳에 빠르게 모아볼 수 있습니다.
+                  핀 버튼을 누른 과제는 여기서 빠르게 다시 볼 수 있습니다.
                 </p>
               </li>
             )}

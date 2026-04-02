@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   createAssignmentWithAssets,
   deleteAssignment,
-  fetchAssignments,
-  updateAssignment,
+  toggleAssignmentFlags,
+  updateAssignmentWithAssets,
 } from '../../lib/assignments'
-import { createSubject, ensureDefaultSubject, fetchSubjects } from '../../lib/subjects'
-import { useStorageUsage } from '../../hooks/useStorageUsage'
-import type { Assignment, Subject } from '../../types'
+import { createSubject } from '../../lib/subjects'
+import type { Assignment } from '../../types'
+import { EditIcon, PinIcon } from '../common/ActionIcons'
 import { NewAssignmentModal } from './NewAssignmentModal'
+import { useUserWorkspace } from './useUserWorkspace'
 import styles from './AssignmentsPage.module.css'
 
 const pastelOptions = [
@@ -25,9 +26,22 @@ const pastelOptions = [
 function formatDueDate(isoDate: string) {
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
-    month: 'short',
+    month: 'long',
     day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   }).format(new Date(isoDate))
+}
+
+function sortAssignments(assignments: Assignment[]) {
+  return [...assignments].sort((left, right) => {
+    if (left.isFavorite !== right.isFavorite) {
+      return Number(right.isFavorite) - Number(left.isFavorite)
+    }
+
+    return new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime()
+  })
 }
 
 function SubmittedToggle({
@@ -52,7 +66,7 @@ function SubmittedToggle({
           assignment.submitted ? `${styles.statusCircle} ${styles.statusDone}` : styles.statusCircle
         }
       >
-        {assignment.submitted ? 'v' : ''}
+        {assignment.submitted ? '✓' : ''}
       </span>
     </button>
   )
@@ -95,7 +109,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
             새 과목 추가
           </h2>
           <button className={styles.closeButton} onClick={onClose} aria-label="과목 모달 닫기">
-            x
+            ×
           </button>
         </header>
 
@@ -103,7 +117,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
           <span>과목명</span>
           <input
             type="text"
-            placeholder="예: 문학"
+            placeholder="예: 선형대수"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -145,63 +159,22 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
 }
 
 export function AssignmentsPage() {
-  const { summary, refresh: refreshUsage } = useStorageUsage()
+  const { assignments, subjects, storageSummary, isLoading, dataError, refreshAll } = useUserWorkspace()
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
   const [subjectFilter, setSubjectFilter] = useState('all')
-  const [subjectList, setSubjectList] = useState<Subject[]>([])
-  const [assignmentList, setAssignmentList] = useState<Assignment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadData() {
-    setIsLoading(true)
-    setError(null)
-
-    const { error: defaultError } = await ensureDefaultSubject()
-    if (defaultError) {
-      setError(defaultError.message)
-      setIsLoading(false)
-      return
-    }
-
-    const [
-      { data: nextSubjects, error: subjectError },
-      { data: nextAssignments, error: assignmentError },
-    ] = await Promise.all([fetchSubjects(), fetchAssignments()])
-
-    if (subjectError || assignmentError) {
-      setError(subjectError?.message ?? assignmentError?.message ?? '과제 목록을 불러오지 못했습니다.')
-      setSubjectList(nextSubjects ?? [])
-      setAssignmentList(nextAssignments ?? [])
-      setIsLoading(false)
-      return
-    }
-
-    setSubjectList(nextSubjects ?? [])
-    setAssignmentList(nextAssignments ?? [])
-    setIsLoading(false)
-  }
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void loadData()
-    })
-  }, [])
-
-  const activeSubjectFilter =
-    subjectFilter !== 'all' && !subjectList.some((subject) => subject.id === subjectFilter)
-      ? 'all'
-      : subjectFilter
-
+  const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
   const filteredAssignments = useMemo(() => {
-    if (activeSubjectFilter === 'all') {
-      return assignmentList
+    if (subjectFilter === 'all') {
+      return sortedAssignments
     }
 
-    return assignmentList.filter((assignment) => assignment.subjectId === activeSubjectFilter)
-  }, [activeSubjectFilter, assignmentList])
+    return sortedAssignments.filter((assignment) => assignment.subjectId === subjectFilter)
+  }, [sortedAssignments, subjectFilter])
 
   async function handleCreateSubject(name: string, color: string) {
     setIsSaving(true)
@@ -220,56 +193,72 @@ export function AssignmentsPage() {
 
     setIsSaving(false)
     setIsSubjectModalOpen(false)
-    await loadData()
+    await refreshAll()
   }
 
   async function handleToggleSubmitted(assignment: Assignment) {
     setIsSaving(true)
     setError(null)
-    const { error: updateError } = await updateAssignment(assignment.id, {
+
+    const { error: updateError } = await toggleAssignmentFlags(assignment.id, {
       submitted: !assignment.submitted,
     })
+
     if (updateError) {
       setError(updateError.message)
       setIsSaving(false)
       return
     }
+
     setIsSaving(false)
-    await loadData()
+    await refreshAll()
   }
 
   async function handleToggleFavorite(assignment: Assignment) {
     setIsSaving(true)
     setError(null)
-    const { error: updateError } = await updateAssignment(assignment.id, {
+
+    const { error: updateError } = await toggleAssignmentFlags(assignment.id, {
       isFavorite: !assignment.isFavorite,
     })
+
     if (updateError) {
       setError(updateError.message)
       setIsSaving(false)
       return
     }
+
     setIsSaving(false)
-    await loadData()
+    await refreshAll()
   }
 
   async function handleDeleteAssignment(assignment: Assignment) {
     setIsSaving(true)
     setError(null)
+
     const { error: deleteError } = await deleteAssignment(assignment.id)
     if (deleteError) {
       setError(deleteError.message)
       setIsSaving(false)
       return
     }
+
     setIsSaving(false)
-    refreshUsage()
-    await loadData()
+    await refreshAll()
   }
 
-  async function handleCreatedAssignment() {
-    refreshUsage()
-    await loadData()
+  async function handleSavedAssignment() {
+    await refreshAll()
+  }
+
+  function openCreateModal() {
+    setEditingAssignment(null)
+    setIsAssignmentModalOpen(true)
+  }
+
+  function openEditModal(assignment: Assignment) {
+    setEditingAssignment(assignment)
+    setIsAssignmentModalOpen(true)
   }
 
   return (
@@ -281,11 +270,11 @@ export function AssignmentsPage() {
             <label className={styles.selectShell}>
               <span className={styles.visuallyHidden}>과목별 필터</span>
               <select
-                value={activeSubjectFilter}
+                value={subjectFilter}
                 onChange={(event) => setSubjectFilter(event.target.value)}
               >
                 <option value="all">전체 과목</option>
-                {subjectList.map((subject) => (
+                {subjects.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
                   </option>
@@ -299,17 +288,14 @@ export function AssignmentsPage() {
             >
               + 과목
             </button>
-            <button
-              className={styles.primaryButton}
-              type="button"
-              onClick={() => setIsAssignmentModalOpen(true)}
-            >
+            <button className={styles.primaryButton} type="button" onClick={openCreateModal}>
               과제 추가
             </button>
           </div>
         </div>
 
         {error ? <p className={styles.errorText}>{error}</p> : null}
+        {dataError ? <p className={styles.errorText}>{dataError}</p> : null}
         {isLoading ? <p className={styles.helperText}>과제 목록을 불러오는 중입니다...</p> : null}
 
         <div className={styles.tableWrapper}>
@@ -318,19 +304,20 @@ export function AssignmentsPage() {
               <tr>
                 <th>과목</th>
                 <th>과제명</th>
-                <th>마감일</th>
+                <th>마감일시</th>
                 <th>제출</th>
-                <th>즐겨찾기</th>
+                <th>고정</th>
                 <th>링크</th>
                 <th>파일</th>
+                <th>수정</th>
                 <th aria-label="삭제" />
               </tr>
             </thead>
             <tbody>
               {!isLoading && filteredAssignments.length === 0 ? (
                 <tr>
-                  <td className={styles.emptyState} colSpan={8}>
-                    이 필터에 맞는 과제가 아직 없습니다.
+                  <td className={styles.emptyState} colSpan={9}>
+                    현재 필터에 맞는 과제가 없습니다.
                   </td>
                 </tr>
               ) : null}
@@ -357,12 +344,14 @@ export function AssignmentsPage() {
                   <td>
                     <button
                       type="button"
-                      className={assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted}
+                      className={
+                        assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted
+                      }
                       onClick={() => void handleToggleFavorite(assignment)}
                       disabled={isSaving}
-                      aria-label={assignment.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위에 고정'}
                     >
-                      *
+                      <PinIcon className={styles.pinIcon} />
                     </button>
                   </td>
                   <td>
@@ -383,12 +372,23 @@ export function AssignmentsPage() {
                   <td>
                     <button
                       type="button"
+                      className={styles.editButton}
+                      onClick={() => openEditModal(assignment)}
+                      disabled={isSaving}
+                      aria-label="과제 수정"
+                    >
+                      <EditIcon className={styles.editIcon} />
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
                       className={styles.deleteButton}
                       onClick={() => void handleDeleteAssignment(assignment)}
                       disabled={isSaving}
                       aria-label="과제 삭제"
                     >
-                      x
+                      ×
                     </button>
                   </td>
                 </tr>
@@ -400,13 +400,23 @@ export function AssignmentsPage() {
 
       {isAssignmentModalOpen ? (
         <NewAssignmentModal
-          onClose={() => setIsAssignmentModalOpen(false)}
-          onCreated={handleCreatedAssignment}
-          subjects={subjectList}
-          remainingBytes={Math.max(0, summary.personalLimitBytes - summary.personalBytes)}
+          key={editingAssignment?.id ?? 'new-assignment'}
+          assignment={editingAssignment}
+          onClose={() => {
+            setEditingAssignment(null)
+            setIsAssignmentModalOpen(false)
+          }}
+          onSaved={handleSavedAssignment}
+          subjects={subjects}
+          remainingBytes={Math.max(
+            0,
+            storageSummary.personalLimitBytes - storageSummary.personalBytes,
+          )}
           createAssignment={createAssignmentWithAssets}
+          updateAssignment={updateAssignmentWithAssets}
         />
       ) : null}
+
       {isSubjectModalOpen ? (
         <NewSubjectModal
           onClose={() => setIsSubjectModalOpen(false)}

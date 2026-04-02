@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { TopTabs } from '../common/TopTabs'
+import { UserWorkspaceProvider } from './UserWorkspaceProvider'
 import styles from './UserShell.module.css'
 
 const userTabs = [
@@ -30,7 +31,9 @@ export function UserShell() {
         </div>
       </header>
       <main className={styles.main}>
-        <Outlet />
+        <UserWorkspaceProvider>
+          <Outlet />
+        </UserWorkspaceProvider>
       </main>
     </div>
   )

@@ -16,9 +16,7 @@ export function TopTabs({ items }: TopTabsProps) {
           key={item.to}
           to={item.to}
           end={item.to === '/'}
-          className={({ isActive }) =>
-            isActive ? `${styles.tab} ${styles.active}` : styles.tab
-          }
+          className={({ isActive }) => (isActive ? `${styles.tab} ${styles.active}` : styles.tab)}
         >
           {item.label}
         </NavLink>

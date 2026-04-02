@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Assignment, Subject } from '../../types'
 import styles from './NewAssignmentModal.module.css'
 
-interface CreateAssignmentInput {
+interface AssignmentFormInput {
   subjectId: string
   title: string
   dueDate: string
@@ -14,11 +14,19 @@ interface CreateAssignmentInput {
 }
 
 interface NewAssignmentModalProps {
+  assignment?: Assignment | null
   onClose: () => void
-  onCreated: () => Promise<void>
+  onSaved: () => Promise<void>
   subjects: Subject[]
   remainingBytes: number
-  createAssignment: (input: CreateAssignmentInput) => Promise<{
+  createAssignment: (input: AssignmentFormInput) => Promise<{
+    data: Assignment | null
+    error: Error | { message: string } | null
+  }>
+  updateAssignment: (
+    assignmentId: string,
+    input: AssignmentFormInput,
+  ) => Promise<{
     data: Assignment | null
     error: Error | { message: string } | null
   }>
@@ -28,19 +36,32 @@ function bytesToMegabytes(bytes: number) {
   return Math.round((bytes / (1024 * 1024)) * 10) / 10
 }
 
+function toDateTimeLocalValue(value?: string) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return offsetDate.toISOString().slice(0, 16)
+}
+
 export function NewAssignmentModal({
+  assignment,
   onClose,
-  onCreated,
+  onSaved,
   subjects,
   remainingBytes,
   createAssignment,
+  updateAssignment,
 }: NewAssignmentModalProps) {
-  const [title, setTitle] = useState('')
-  const [subjectId, setSubjectId] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [description, setDescription] = useState('')
-  const [externalLink, setExternalLink] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const isEditMode = Boolean(assignment)
+  const [title, setTitle] = useState(assignment?.title ?? '')
+  const [subjectId, setSubjectId] = useState(assignment?.subjectId ?? subjects[0]?.id ?? '')
+  const [dueDate, setDueDate] = useState(toDateTimeLocalValue(assignment?.dueDate))
+  const [description, setDescription] = useState(assignment?.description ?? '')
+  const [externalLink, setExternalLink] = useState(assignment?.externalLink ?? '')
+  const [submitted, setSubmitted] = useState(assignment?.submitted ?? false)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,13 +79,13 @@ export function NewAssignmentModal({
 
   async function handleSubmit() {
     if (!title.trim() || !dueDate || !resolvedSubjectId) {
-      setError('과목, 과제명, 마감일은 필수입니다.')
+      setError('과목, 과제명, 마감일시는 필수입니다.')
       return
     }
 
     if (selectedBytes > remainingBytes) {
       setError(
-        `선택한 파일 용량이 너무 큽니다. 남은 용량은 ${bytesToMegabytes(remainingBytes)}MB입니다.`,
+        `선택한 파일 용량이 남은 한도를 넘었습니다. 남은 용량은 ${bytesToMegabytes(remainingBytes)}MB입니다.`,
       )
       return
     }
@@ -72,24 +93,28 @@ export function NewAssignmentModal({
     setIsSubmitting(true)
     setError(null)
 
-    const { error: createError } = await createAssignment({
+    const payload = {
       subjectId: resolvedSubjectId,
       title,
-      dueDate,
+      dueDate: new Date(dueDate).toISOString(),
       submitted,
       description,
       externalLink,
       imageFiles,
       attachmentFiles,
-    })
+    }
 
-    if (createError) {
-      setError(createError.message)
+    const result = assignment
+      ? await updateAssignment(assignment.id, payload)
+      : await createAssignment(payload)
+
+    if (result.error) {
+      setError(result.error.message)
       setIsSubmitting(false)
       return
     }
 
-    await onCreated()
+    await onSaved()
     setIsSubmitting(false)
     onClose()
   }
@@ -100,15 +125,15 @@ export function NewAssignmentModal({
         className={styles.modal}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="new-assignment-title"
+        aria-labelledby="assignment-modal-title"
         onClick={(event) => event.stopPropagation()}
       >
         <header className={styles.header}>
-          <h2 id="new-assignment-title" className={styles.title}>
-            새 과제 등록
+          <h2 id="assignment-modal-title" className={styles.title}>
+            {isEditMode ? '과제 수정' : '새 과제 등록'}
           </h2>
           <button className={styles.closeButton} onClick={onClose} aria-label="모달 닫기">
-            x
+            ×
           </button>
         </header>
 
@@ -118,7 +143,7 @@ export function NewAssignmentModal({
               <span>과제명</span>
               <input
                 type="text"
-                placeholder="예: 한국사 발표 자료"
+                placeholder="예: 발표 자료 정리"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -140,9 +165,9 @@ export function NewAssignmentModal({
               </label>
 
               <label className={styles.field}>
-                <span>마감일</span>
+                <span>마감일시</span>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={dueDate}
                   onChange={(event) => setDueDate(event.target.value)}
                 />
@@ -152,7 +177,7 @@ export function NewAssignmentModal({
             <label className={styles.field}>
               <span>설명</span>
               <textarea
-                placeholder="과제에 대한 간단한 메모를 적어 두세요."
+                placeholder="과제에 대한 메모를 적어 두세요."
                 rows={4}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -172,9 +197,9 @@ export function NewAssignmentModal({
 
           <div className={styles.uploadColumn}>
             <div className={styles.uploadField}>
-              <span>첨부파일</span>
+              <span>첨부 파일</span>
               <div className={styles.dropzone}>
-                <p className={styles.helperText}>이미지와 파일을 여러 개 올릴 수 있습니다.</p>
+                <p className={styles.helperText}>이미지와 일반 파일을 각각 여러 개 올릴 수 있습니다.</p>
                 <div className={styles.pickerGrid}>
                   <label className={styles.filePickerLabel}>
                     이미지 추가
@@ -194,17 +219,13 @@ export function NewAssignmentModal({
                     />
                   </label>
                 </div>
+                {assignment?.assets?.length ? (
+                  <p className={styles.fileSummary}>기존 첨부 {assignment.assets.length}개 유지됨</p>
+                ) : null}
                 <p className={styles.fileSummary}>
-                  이미지 {imageFiles.length}개, 파일 {attachmentFiles.length}개, 총{' '}
+                  새 이미지 {imageFiles.length}개, 새 파일 {attachmentFiles.length}개, 총{' '}
                   {bytesToMegabytes(selectedBytes)}MB 선택됨
                 </p>
-                {imageFiles.length > 0 ? (
-                  <ul className={styles.fileList}>
-                    {imageFiles.slice(0, 3).map((file) => (
-                      <li key={`${file.name}-${file.size}`}>{file.name}</li>
-                    ))}
-                  </ul>
-                ) : null}
               </div>
             </div>
 
@@ -217,9 +238,7 @@ export function NewAssignmentModal({
               <span>제출 완료로 표시</span>
             </label>
 
-            <p className={styles.helperText}>
-              남은 개인 저장공간: {bytesToMegabytes(remainingBytes)}MB
-            </p>
+            <p className={styles.helperText}>남은 개인 저장공간 {bytesToMegabytes(remainingBytes)}MB</p>
             {error ? <p className={styles.errorText}>{error}</p> : null}
 
             <button
@@ -228,7 +247,7 @@ export function NewAssignmentModal({
               onClick={() => void handleSubmit()}
               disabled={isSubmitting}
             >
-              {isSubmitting ? '등록 중...' : '과제 등록'}
+              {isSubmitting ? (isEditMode ? '수정 중...' : '등록 중...') : isEditMode ? '과제 수정' : '과제 등록'}
             </button>
           </div>
         </div>

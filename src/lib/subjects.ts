@@ -69,7 +69,7 @@ export async function ensureDefaultSubject() {
     .from('subjects')
     .insert({
       owner_user_id: userId,
-      name: 'Uncategorized',
+      name: '미지정',
       color: '#d7dee7',
       is_default: true,
     })
@@ -92,7 +92,7 @@ export async function createSubject(name: string, color: string) {
   if (!userId) {
     return {
       data: null as Subject | null,
-      error: new Error('You must be signed in to create a subject.'),
+      error: new Error('과목을 만들려면 먼저 로그인해 주세요.'),
     }
   }
 
@@ -100,7 +100,7 @@ export async function createSubject(name: string, color: string) {
   if (!trimmed) {
     return {
       data: null as Subject | null,
-      error: new Error('Subject name is required.'),
+      error: new Error('과목명은 비워둘 수 없습니다.'),
     }
   }
 

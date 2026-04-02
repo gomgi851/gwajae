@@ -161,7 +161,7 @@ begin
 
   if default_subject_id is null then
     insert into public.subjects (owner_user_id, name, color, is_default)
-    values (target_user_id, 'Uncategorized', '#d7dee7', true)
+    values (target_user_id, '미지정', '#d7dee7', true)
     returning id into default_subject_id;
   end if;
 
@@ -188,7 +188,7 @@ for each row
 execute function public.create_default_subject_for_new_user();
 
 insert into public.subjects (owner_user_id, name, color, is_default)
-select u.id, 'Uncategorized', '#d7dee7', true
+select u.id, '미지정', '#d7dee7', true
 from auth.users u
 where not exists (
   select 1
@@ -202,7 +202,7 @@ create table if not exists public.assignments (
   owner_user_id uuid not null references auth.users(id) on delete cascade,
   subject_id uuid not null references public.subjects(id) on delete restrict,
   title text not null,
-  due_date date not null,
+  due_date timestamptz not null,
   submitted boolean not null default false,
   is_favorite boolean not null default false,
   description text,
@@ -210,6 +210,33 @@ create table if not exists public.assignments (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+do $$
+declare
+  due_date_type text;
+begin
+  select data_type
+    into due_date_type
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'assignments'
+    and column_name = 'due_date';
+
+  if due_date_type = 'date' then
+    execute '
+      alter table public.assignments
+      alter column due_date type timestamptz
+      using due_date::timestamp with time zone
+    ';
+  elsif due_date_type = 'timestamp without time zone' then
+    execute '
+      alter table public.assignments
+      alter column due_date type timestamptz
+      using due_date at time zone ''Asia/Seoul''
+    ';
+  end if;
+end
+$$;
 
 create index if not exists assignments_owner_due_date_idx
 on public.assignments (owner_user_id, due_date, created_at desc);

@@ -15,7 +15,7 @@ function ProjectStorageCard({ usedMb, totalMb }: { usedMb: number; totalMb: numb
   return (
     <section className={styles.storageCard}>
       <div>
-        <p className={styles.storageLabel}>프로젝트 저장공간</p>
+        <p className={styles.storageLabel}>프로젝트 저장 공간</p>
         <h2 className={styles.storageTitle}>전체 업로드 사용량</h2>
       </div>
       <div className={styles.storageMeta}>
@@ -98,7 +98,7 @@ export function AdminPage() {
 
   async function toggleRole(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 내 관리자 권한은 여기서 바꿀 수 없습니다.')
+      setError('현재 로그인한 관리자 계정의 권한은 여기서 바꿀 수 없습니다.')
       return
     }
 
@@ -120,7 +120,7 @@ export function AdminPage() {
 
   async function toggleActive(entry: AllowedUser) {
     if (entry.email === currentEmail) {
-      setError('현재 로그인한 내 계정은 여기서 비활성화할 수 없습니다.')
+      setError('현재 로그인한 계정은 여기서 비활성화할 수 없습니다.')
       return
     }
 
@@ -161,7 +161,7 @@ export function AdminPage() {
                 <input
                   className={styles.input}
                   type="email"
-                  placeholder="허용할 구글 이메일 입력"
+                  placeholder="허용할 구글 이메일을 입력해 주세요"
                   aria-label="초대할 사용자 이메일"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
@@ -187,10 +187,10 @@ export function AdminPage() {
           {error ? <p className={styles.errorText}>{error}</p> : null}
           {storageError ? (
             <p className={styles.helperText}>
-              이 저장공간 수치는 데이터베이스가 아니라 사용자가 올린 첨부파일 총합 기준입니다.
+              이 저장공간 수치는 데이터베이스가 아니라, 사용자가 올린 첨부파일 총합 기준입니다.
             </p>
           ) : null}
-          {isLoading ? <p className={styles.helperText}>허용된 사용자를 불러오는 중입니다...</p> : null}
+          {isLoading ? <p className={styles.helperText}>허용 사용자 목록을 불러오는 중입니다...</p> : null}
 
           {!isLoading ? (
             <table className={styles.table}>

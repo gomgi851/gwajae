@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 
 const ASSIGNMENT_BUCKET = 'assignment-assets'
 
-interface CreateAssignmentInput {
+interface AssignmentFormInput {
   subjectId: string
   title: string
   dueDate: string
@@ -18,7 +18,6 @@ interface SubjectRow {
   id: string
   name: string
   color: string
-  is_default?: boolean
 }
 
 interface AssetRow {
@@ -73,10 +72,10 @@ function mapAssignment(row: AssignmentRow): Assignment {
     dueDate: row.due_date,
     submitted: Boolean(row.submitted),
     isFavorite: Boolean(row.is_favorite),
+    attachmentCount: assets.length,
     description: row.description ?? '',
     externalLink: row.external_link,
-    attachmentCount: assets.length,
-    subjectName: subject?.name ?? 'Unknown',
+    subjectName: subject?.name ?? '미지정',
     subjectColor: subject?.color ?? '#d7dee7',
     assets,
   }
@@ -89,6 +88,102 @@ async function getCurrentUser() {
 
   const { data } = await supabase.auth.getUser()
   return data.user ?? null
+}
+
+async function fetchSingleAssignment(assignmentId: string) {
+  if (!supabase) {
+    return { data: null as Assignment | null, error: null }
+  }
+
+  const { data, error } = await supabase
+    .from('assignments')
+    .select(`
+      id,
+      subject_id,
+      title,
+      due_date,
+      submitted,
+      is_favorite,
+      description,
+      external_link,
+      subject:subjects(id,name,color),
+      assets:assignment_assets(
+        id,
+        assignment_id,
+        storage_path,
+        file_name,
+        asset_type,
+        size_bytes,
+        is_thumbnail,
+        created_at
+      )
+    `)
+    .eq('id', assignmentId)
+    .single()
+
+  if (error) {
+    return { data: null as Assignment | null, error }
+  }
+
+  return { data: mapAssignment(data as unknown as AssignmentRow), error: null }
+}
+
+async function uploadAssets(
+  ownerUserId: string,
+  assignmentId: string,
+  imageFiles: File[],
+  attachmentFiles: File[],
+) {
+  if (!supabase) {
+    return { error: null }
+  }
+
+  const filesToUpload = [
+    ...imageFiles.map((file, index) => ({
+      file,
+      assetType: 'image' as const,
+      isThumbnail: index === 0,
+    })),
+    ...attachmentFiles.map((file) => ({
+      file,
+      assetType: 'file' as const,
+      isThumbnail: false,
+    })),
+  ]
+
+  if (filesToUpload.length === 0) {
+    return { error: null }
+  }
+
+  const uploadedRows: Array<Record<string, unknown>> = []
+
+  for (const entry of filesToUpload) {
+    const storagePath = `${ownerUserId}/${assignmentId}/${crypto.randomUUID()}-${sanitizeFileName(entry.file.name)}`
+
+    const { error: uploadError } = await supabase.storage
+      .from(ASSIGNMENT_BUCKET)
+      .upload(storagePath, entry.file, {
+        upsert: false,
+        contentType: entry.file.type || undefined,
+      })
+
+    if (uploadError) {
+      return { error: uploadError }
+    }
+
+    uploadedRows.push({
+      assignment_id: assignmentId,
+      owner_user_id: ownerUserId,
+      storage_path: storagePath,
+      file_name: entry.file.name,
+      asset_type: entry.assetType,
+      size_bytes: entry.file.size,
+      is_thumbnail: entry.isThumbnail,
+    })
+  }
+
+  const { error: assetError } = await supabase.from('assignment_assets').insert(uploadedRows)
+  return { error: assetError }
 }
 
 export async function fetchAssignments() {
@@ -107,7 +202,7 @@ export async function fetchAssignments() {
       is_favorite,
       description,
       external_link,
-      subject:subjects(id,name,color,is_default),
+      subject:subjects(id,name,color),
       assets:assignment_assets(
         id,
         assignment_id,
@@ -120,7 +215,6 @@ export async function fetchAssignments() {
       )
     `)
     .order('due_date', { ascending: true })
-    .order('created_at', { ascending: false })
 
   if (error) {
     return { data: [] as Assignment[], error }
@@ -132,7 +226,7 @@ export async function fetchAssignments() {
   }
 }
 
-export async function createAssignmentWithAssets(input: CreateAssignmentInput) {
+export async function createAssignmentWithAssets(input: AssignmentFormInput) {
   if (!supabase) {
     return { data: null as Assignment | null, error: null }
   }
@@ -141,15 +235,7 @@ export async function createAssignmentWithAssets(input: CreateAssignmentInput) {
   if (!user) {
     return {
       data: null as Assignment | null,
-      error: new Error('You must be signed in to create an assignment.'),
-    }
-  }
-
-  const title = input.title.trim()
-  if (!title) {
-    return {
-      data: null as Assignment | null,
-      error: new Error('Assignment title is required.'),
+      error: new Error('과제를 등록하려면 먼저 로그인해 주세요.'),
     }
   }
 
@@ -158,7 +244,7 @@ export async function createAssignmentWithAssets(input: CreateAssignmentInput) {
     .insert({
       owner_user_id: user.id,
       subject_id: input.subjectId,
-      title,
+      title: input.title.trim(),
       due_date: input.dueDate,
       submitted: input.submitted,
       is_favorite: false,
@@ -173,87 +259,64 @@ export async function createAssignmentWithAssets(input: CreateAssignmentInput) {
   }
 
   const assignmentId = insertedAssignment.id as string
-  const filesToUpload = [
-    ...input.imageFiles.map((file, index) => ({
-      file,
-      assetType: 'image' as const,
-      isThumbnail: index === 0,
-    })),
-    ...input.attachmentFiles.map((file) => ({
-      file,
-      assetType: 'file' as const,
-      isThumbnail: false,
-    })),
-  ]
+  const { error: uploadError } = await uploadAssets(
+    user.id,
+    assignmentId,
+    input.imageFiles,
+    input.attachmentFiles,
+  )
 
-  const uploadedRows: Array<Record<string, unknown>> = []
-
-  for (const entry of filesToUpload) {
-    const storagePath = `${user.id}/${assignmentId}/${crypto.randomUUID()}-${sanitizeFileName(entry.file.name)}`
-
-    const { error: uploadError } = await supabase.storage
-      .from(ASSIGNMENT_BUCKET)
-      .upload(storagePath, entry.file, {
-        upsert: false,
-        contentType: entry.file.type || undefined,
-      })
-
-    if (uploadError) {
-      return { data: null as Assignment | null, error: uploadError }
-    }
-
-    uploadedRows.push({
-      assignment_id: assignmentId,
-      owner_user_id: user.id,
-      storage_path: storagePath,
-      file_name: entry.file.name,
-      asset_type: entry.assetType,
-      size_bytes: entry.file.size,
-      is_thumbnail: entry.isThumbnail,
-    })
+  if (uploadError) {
+    return { data: null as Assignment | null, error: uploadError }
   }
 
-  if (uploadedRows.length > 0) {
-    const { error: assetError } = await supabase.from('assignment_assets').insert(uploadedRows)
-    if (assetError) {
-      return { data: null as Assignment | null, error: assetError }
-    }
-  }
-
-  const { data, error } = await supabase
-    .from('assignments')
-    .select(`
-      id,
-      subject_id,
-      title,
-      due_date,
-      submitted,
-      is_favorite,
-      description,
-      external_link,
-      subject:subjects(id,name,color,is_default),
-      assets:assignment_assets(
-        id,
-        assignment_id,
-        storage_path,
-        file_name,
-        asset_type,
-        size_bytes,
-        is_thumbnail,
-        created_at
-      )
-    `)
-    .eq('id', assignmentId)
-    .single()
-
-  if (error) {
-    return { data: null as Assignment | null, error }
-  }
-
-  return { data: mapAssignment(data as unknown as AssignmentRow), error: null }
+  return fetchSingleAssignment(assignmentId)
 }
 
-export async function updateAssignment(
+export async function updateAssignmentWithAssets(assignmentId: string, input: AssignmentFormInput) {
+  if (!supabase) {
+    return { data: null as Assignment | null, error: null }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    return {
+      data: null as Assignment | null,
+      error: new Error('과제를 수정하려면 먼저 로그인해 주세요.'),
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from('assignments')
+    .update({
+      subject_id: input.subjectId,
+      title: input.title.trim(),
+      due_date: input.dueDate,
+      submitted: input.submitted,
+      description: input.description.trim() || null,
+      external_link: input.externalLink.trim() || null,
+    })
+    .eq('id', assignmentId)
+
+  if (updateError) {
+    return { data: null as Assignment | null, error: updateError }
+  }
+
+  const { error: uploadError } = await uploadAssets(
+    user.id,
+    assignmentId,
+    input.imageFiles,
+    input.attachmentFiles,
+  )
+
+  if (uploadError) {
+    return { data: null as Assignment | null, error: uploadError }
+  }
+
+  return fetchSingleAssignment(assignmentId)
+}
+
+export async function toggleAssignmentFlags(
   assignmentId: string,
   updates: Partial<Pick<Assignment, 'submitted' | 'isFavorite'>>,
 ) {
@@ -271,38 +334,8 @@ export async function updateAssignment(
     payload.is_favorite = updates.isFavorite
   }
 
-  const { data, error } = await supabase
-    .from('assignments')
-    .update(payload)
-    .eq('id', assignmentId)
-    .select(`
-      id,
-      subject_id,
-      title,
-      due_date,
-      submitted,
-      is_favorite,
-      description,
-      external_link,
-      subject:subjects(id,name,color,is_default),
-      assets:assignment_assets(
-        id,
-        assignment_id,
-        storage_path,
-        file_name,
-        asset_type,
-        size_bytes,
-        is_thumbnail,
-        created_at
-      )
-    `)
-    .single()
-
-  if (error) {
-    return { data: null as Assignment | null, error }
-  }
-
-  return { data: mapAssignment(data as unknown as AssignmentRow), error: null }
+  const { error } = await supabase.from('assignments').update(payload).eq('id', assignmentId)
+  return { data: null as Assignment | null, error }
 }
 
 export async function deleteAssignment(assignmentId: string) {
@@ -319,9 +352,7 @@ export async function deleteAssignment(assignmentId: string) {
     return { error: assetError }
   }
 
-  const storagePaths = (assets ?? [])
-    .map((row) => String(row.storage_path ?? ''))
-    .filter(Boolean)
+  const storagePaths = (assets ?? []).map((row) => String(row.storage_path ?? '')).filter(Boolean)
 
   if (storagePaths.length > 0) {
     const { error: removeError } = await supabase.storage

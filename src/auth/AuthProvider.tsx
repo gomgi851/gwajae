@@ -63,7 +63,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAllowedUser(null)
         setAccessMessage(
           error.code === '42P01'
-            ? 'SQL Editor에서 최신 supabase/setup.sql을 실행해 allowed_users 테이블을 만들어 주세요.'
+            ? 'SQL Editor에서 최신 supabase/setup.sql을 실행해서 allowed_users 테이블을 먼저 만들어 주세요.'
             : error.message,
         )
         setIsLoading(false)
