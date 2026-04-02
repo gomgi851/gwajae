@@ -203,6 +203,16 @@
   font-weight: 800;
 }
 
+.ddayWarning {
+  background: rgba(244, 151, 58, 0.16);
+  color: #a55f1f;
+}
+
+.ddayUrgent {
+  background: rgba(229, 92, 92, 0.16);
+  color: #b24646;
+}
+
 .statusButton {
   border: none;
   background: transparent;

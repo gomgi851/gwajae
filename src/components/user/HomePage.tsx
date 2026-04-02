@@ -30,6 +30,25 @@ function getDdayLabel(dueDate: string) {
   return `D+${Math.abs(diffDays)}`
 }
 
+function getDdayTone(dueDate: string) {
+  const today = new Date()
+  const due = new Date(dueDate)
+
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate())
+  const diffDays = Math.round((dueStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays <= 0) {
+    return styles.ddayUrgent
+  }
+
+  if (diffDays <= 3) {
+    return styles.ddayWarning
+  }
+
+  return ''
+}
+
 function formatDueDetail(dueDate: string) {
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'long',
@@ -164,7 +183,9 @@ function DeadlineRow({
       </div>
 
       <div className={styles.ddayCell}>
-        <span className={styles.ddayBadge}>{getDdayLabel(assignment.dueDate)}</span>
+        <span className={`${styles.ddayBadge} ${getDdayTone(assignment.dueDate)}`}>
+          {getDdayLabel(assignment.dueDate)}
+        </span>
       </div>
 
       <div className={styles.actionCell}>
@@ -192,7 +213,9 @@ function FavoriteRow({ assignment }: { assignment: Assignment }) {
       </div>
 
       <div className={styles.ddayCell}>
-        <span className={styles.ddayBadge}>{getDdayLabel(assignment.dueDate)}</span>
+        <span className={`${styles.ddayBadge} ${getDdayTone(assignment.dueDate)}`}>
+          {getDdayLabel(assignment.dueDate)}
+        </span>
       </div>
 
       <div className={styles.actionCell}>

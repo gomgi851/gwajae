@@ -211,7 +211,7 @@ export function NewAssignmentModal({
               <span>설명</span>
               <textarea
                 placeholder="과제에 대한 메모를 적어 두세요."
-                rows={4}
+                rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
@@ -230,130 +230,131 @@ export function NewAssignmentModal({
 
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>첨부 관리</h3>
+            <div className={styles.attachmentsGrid}>
+              <div className={styles.attachmentPanel}>
+                <div className={styles.panelHeader}>
+                  <span className={styles.panelTitle}>기존 첨부</span>
+                  <span className={styles.panelMeta}>
+                    이미지 {visibleExistingImages.length}개 / 파일 {visibleExistingFiles.length}개
+                  </span>
+                </div>
 
-            <div className={styles.attachmentPanel}>
-              <div className={styles.panelHeader}>
-                <span className={styles.panelTitle}>기존 첨부</span>
-                <span className={styles.panelMeta}>
-                  이미지 {visibleExistingImages.length}개 / 파일 {visibleExistingFiles.length}개
-                </span>
+                {visibleExistingImages.length === 0 && visibleExistingFiles.length === 0 ? (
+                  <p className={styles.emptyText}>아직 첨부된 파일이 없습니다.</p>
+                ) : (
+                  <ul className={styles.assetList}>
+                    {visibleExistingImages.map((asset) => (
+                      <li key={asset.id} className={styles.assetItem}>
+                        <div className={styles.assetInfo}>
+                          <span className={styles.assetName}>{asset.fileName}</span>
+                          <span className={styles.assetMeta}>
+                            이미지 · {bytesToMegabytes(asset.sizeBytes)}MB
+                            {asset.isThumbnail ? ' · 썸네일' : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeChip}
+                          onClick={() => markExistingAssetRemoved(asset.id)}
+                        >
+                          삭제
+                        </button>
+                      </li>
+                    ))}
+                    {visibleExistingFiles.map((asset) => (
+                      <li key={asset.id} className={styles.assetItem}>
+                        <div className={styles.assetInfo}>
+                          <span className={styles.assetName}>{asset.fileName}</span>
+                          <span className={styles.assetMeta}>
+                            파일 · {bytesToMegabytes(asset.sizeBytes)}MB
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeChip}
+                          onClick={() => markExistingAssetRemoved(asset.id)}
+                        >
+                          삭제
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
-              {visibleExistingImages.length === 0 && visibleExistingFiles.length === 0 ? (
-                <p className={styles.emptyText}>아직 첨부된 파일이 없습니다.</p>
-              ) : (
-                <ul className={styles.assetList}>
-                  {visibleExistingImages.map((asset) => (
-                    <li key={asset.id} className={styles.assetItem}>
-                      <div className={styles.assetInfo}>
-                        <span className={styles.assetName}>{asset.fileName}</span>
-                        <span className={styles.assetMeta}>
-                          이미지 · {bytesToMegabytes(asset.sizeBytes)}MB
-                          {asset.isThumbnail ? ' · 썸네일' : ''}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.removeChip}
-                        onClick={() => markExistingAssetRemoved(asset.id)}
-                      >
-                        삭제
-                      </button>
-                    </li>
-                  ))}
-                  {visibleExistingFiles.map((asset) => (
-                    <li key={asset.id} className={styles.assetItem}>
-                      <div className={styles.assetInfo}>
-                        <span className={styles.assetName}>{asset.fileName}</span>
-                        <span className={styles.assetMeta}>
-                          파일 · {bytesToMegabytes(asset.sizeBytes)}MB
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.removeChip}
-                        onClick={() => markExistingAssetRemoved(asset.id)}
-                      >
-                        삭제
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              <div className={styles.attachmentPanel}>
+                <div className={styles.panelHeader}>
+                  <span className={styles.panelTitle}>새 첨부 추가</span>
+                  <span className={styles.panelMeta}>이번 저장 때 함께 업로드됩니다.</span>
+                </div>
 
-            <div className={styles.attachmentPanel}>
-              <div className={styles.panelHeader}>
-                <span className={styles.panelTitle}>새 첨부 추가</span>
-                <span className={styles.panelMeta}>이번 저장 때 함께 업로드됩니다.</span>
+                <div className={styles.pickerRow}>
+                  <label className={styles.filePickerLabel}>
+                    이미지 추가
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) =>
+                        addFiles(Array.from(event.target.files ?? []), setImageFiles)
+                      }
+                    />
+                  </label>
+                  <label className={styles.filePickerLabel}>
+                    파일 추가
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(event) =>
+                        addFiles(Array.from(event.target.files ?? []), setAttachmentFiles)
+                      }
+                    />
+                  </label>
+                </div>
+
+                {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
+                  <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
+                ) : (
+                  <ul className={styles.assetList}>
+                    {imageFiles.map((file, index) => (
+                      <li key={`${file.name}-${index}`} className={styles.assetItem}>
+                        <div className={styles.assetInfo}>
+                          <span className={styles.assetName}>{file.name}</span>
+                          <span className={styles.assetMeta}>
+                            이미지 · {bytesToMegabytes(file.size)}MB
+                            {index === 0 ? ' · 첫 이미지가 썸네일' : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeChip}
+                          onClick={() => removeNewImage(index)}
+                        >
+                          제거
+                        </button>
+                      </li>
+                    ))}
+
+                    {attachmentFiles.map((file, index) => (
+                      <li key={`${file.name}-${file.size}-${index}`} className={styles.assetItem}>
+                        <div className={styles.assetInfo}>
+                          <span className={styles.assetName}>{file.name}</span>
+                          <span className={styles.assetMeta}>
+                            파일 · {bytesToMegabytes(file.size)}MB
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeChip}
+                          onClick={() => removeNewAttachment(index)}
+                        >
+                          제거
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-
-              <div className={styles.pickerRow}>
-                <label className={styles.filePickerLabel}>
-                  이미지 추가
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(event) =>
-                      addFiles(Array.from(event.target.files ?? []), setImageFiles)
-                    }
-                  />
-                </label>
-                <label className={styles.filePickerLabel}>
-                  파일 추가
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(event) =>
-                      addFiles(Array.from(event.target.files ?? []), setAttachmentFiles)
-                    }
-                  />
-                </label>
-              </div>
-
-              {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
-                <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
-              ) : (
-                <ul className={styles.assetList}>
-                  {imageFiles.map((file, index) => (
-                    <li key={`${file.name}-${index}`} className={styles.assetItem}>
-                      <div className={styles.assetInfo}>
-                        <span className={styles.assetName}>{file.name}</span>
-                        <span className={styles.assetMeta}>
-                          이미지 · {bytesToMegabytes(file.size)}MB
-                          {index === 0 ? ' · 첫 이미지가 썸네일' : ''}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.removeChip}
-                        onClick={() => removeNewImage(index)}
-                      >
-                        제거
-                      </button>
-                    </li>
-                  ))}
-
-                  {attachmentFiles.map((file, index) => (
-                    <li key={`${file.name}-${file.size}-${index}`} className={styles.assetItem}>
-                      <div className={styles.assetInfo}>
-                        <span className={styles.assetName}>{file.name}</span>
-                        <span className={styles.assetMeta}>
-                          파일 · {bytesToMegabytes(file.size)}MB
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.removeChip}
-                        onClick={() => removeNewAttachment(index)}
-                      >
-                        제거
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           </section>
         </div>
