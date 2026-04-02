@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useI18n } from '../../i18n/useI18n'
 import {
   createAssignmentWithAssets,
   deleteAssignment,
@@ -23,8 +24,8 @@ const pastelOptions = [
   '#d0daf5',
 ]
 
-function formatDueDate(isoDate: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
+function formatDueDate(isoDate: string, locale: string) {
+  return new Intl.DateTimeFormat(locale === 'ko' ? 'ko-KR' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -48,10 +49,12 @@ function SubmittedToggle({
   assignment,
   onToggle,
   disabled,
+  labels,
 }: {
   assignment: Assignment
   onToggle: (assignment: Assignment) => Promise<void>
   disabled: boolean
+  labels: { markUnsubmitted: string; markSubmitted: string }
 }) {
   return (
     <button
@@ -59,7 +62,7 @@ function SubmittedToggle({
       className={styles.statusButton}
       onClick={() => void onToggle(assignment)}
       disabled={disabled}
-      aria-label={assignment.submitted ? '미제출로 변경' : '제출 완료로 변경'}
+      aria-label={assignment.submitted ? labels.markUnsubmitted : labels.markSubmitted}
     >
       <span
         className={
@@ -79,6 +82,7 @@ interface NewSubjectModalProps {
 }
 
 function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [color, setColor] = useState(pastelOptions[0])
   const [error, setError] = useState<string | null>(null)
@@ -86,7 +90,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('과목명을 먼저 입력해 주세요.')
+      setError(t.newSubject.nameRequired)
       return
     }
 
@@ -106,25 +110,25 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
       >
         <header className={styles.subjectModalHeader}>
           <h2 id="new-subject-title" className={styles.subjectModalTitle}>
-            새 과목 추가
+            {t.newSubject.title}
           </h2>
-          <button className={styles.closeButton} onClick={onClose} aria-label="과목 모달 닫기">
+          <button className={styles.closeButton} onClick={onClose} aria-label={t.newSubject.closeModal}>
             ×
           </button>
         </header>
 
         <label className={styles.subjectField}>
-          <span>과목명</span>
+          <span>{t.newSubject.name}</span>
           <input
             type="text"
-            placeholder="예: 자료구조"
+            placeholder={t.newSubject.namePlaceholder}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </label>
 
         <div className={styles.subjectField}>
-          <span>파스텔 색상</span>
+          <span>{t.newSubject.color}</span>
           <div className={styles.colorGrid}>
             {pastelOptions.map((option) => (
               <button
@@ -137,7 +141,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
                 }
                 style={{ backgroundColor: option }}
                 onClick={() => setColor(option)}
-                aria-label={`색상 ${option} 선택`}
+                aria-label={t.newSubject.colorSelect.replace('{color}', option)}
               />
             ))}
           </div>
@@ -151,7 +155,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
           onClick={() => void handleCreate()}
           disabled={isSaving}
         >
-          과목 추가
+          {t.newSubject.addButton}
         </button>
       </section>
     </div>
@@ -159,6 +163,7 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
 }
 
 export function AssignmentsPage() {
+  const { t, locale } = useI18n()
   const { assignments, subjects, storageSummary, isLoading, dataError, refreshAll } =
     useUserWorkspace()
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
@@ -266,15 +271,15 @@ export function AssignmentsPage() {
     <>
       <section className={styles.library}>
         <div className={styles.toolbar}>
-          <h1 className={styles.title}>과제 보관함</h1>
+          <h1 className={styles.title}>{t.assignments.library}</h1>
           <div className={styles.actions}>
             <label className={styles.selectShell}>
-              <span className={styles.visuallyHidden}>과목별 필터</span>
+              <span className={styles.visuallyHidden}>{t.assignments.subjectFilter}</span>
               <select
                 value={subjectFilter}
                 onChange={(event) => setSubjectFilter(event.target.value)}
               >
-                <option value="all">전체 과목</option>
+                <option value="all">{t.assignments.allSubjects}</option>
                 {subjects.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
@@ -287,17 +292,17 @@ export function AssignmentsPage() {
               type="button"
               onClick={() => setIsSubjectModalOpen(true)}
             >
-              + 과목
+              {t.assignments.addSubject}
             </button>
             <button className={styles.primaryButton} type="button" onClick={openCreateModal}>
-              과제 추가
+              {t.assignments.addAssignment}
             </button>
           </div>
         </div>
 
         {error ? <p className={styles.errorText}>{error}</p> : null}
         {dataError ? <p className={styles.errorText}>{dataError}</p> : null}
-        {isLoading ? <p className={styles.helperText}>과제 목록을 불러오는 중입니다...</p> : null}
+        {isLoading ? <p className={styles.helperText}>{t.assignments.loading}</p> : null}
 
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
@@ -314,22 +319,22 @@ export function AssignmentsPage() {
             </colgroup>
             <thead>
               <tr>
-                <th>고정</th>
-                <th>과목</th>
-                <th>과제명</th>
-                <th>마감일시</th>
-                <th>제출</th>
-                <th>링크</th>
-                <th>파일</th>
-                <th>수정</th>
-                <th aria-label="삭제" />
+                <th>{t.assignments.pin}</th>
+                <th>{t.assignments.subject}</th>
+                <th>{t.assignments.title}</th>
+                <th>{t.assignments.dueDate}</th>
+                <th>{t.assignments.submitted}</th>
+                <th>{t.assignments.link}</th>
+                <th>{t.assignments.files}</th>
+                <th>{t.assignments.edit}</th>
+                <th aria-label={t.assignments.delete} />
               </tr>
             </thead>
             <tbody>
               {!isLoading && filteredAssignments.length === 0 ? (
                 <tr>
                   <td className={styles.emptyState} colSpan={9}>
-                    현재 필터에 맞는 과제가 없습니다.
+                    {t.assignments.noAssignments}
                   </td>
                 </tr>
               ) : null}
@@ -344,7 +349,7 @@ export function AssignmentsPage() {
                       }
                       onClick={() => void handleToggleFavorite(assignment)}
                       disabled={isSaving}
-                      aria-label={assignment.isFavorite ? '고정 해제' : '맨 위로 고정'}
+                      aria-label={assignment.isFavorite ? t.assignments.unpin : t.assignments.pinToTop}
                     >
                       <PinIcon className={styles.pinIcon} />
                     </button>
@@ -354,16 +359,17 @@ export function AssignmentsPage() {
                       className={styles.subjectPill}
                       style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
                     >
-                      {assignment.subjectName ?? '미지정'}
+                      {assignment.subjectName ?? '—'}
                     </span>
                   </td>
                   <td className={styles.titleCell}>{assignment.title}</td>
-                  <td className={styles.dateCell}>{formatDueDate(assignment.dueDate)}</td>
+                  <td className={styles.dateCell}>{formatDueDate(assignment.dueDate, locale)}</td>
                   <td>
                     <SubmittedToggle
                       assignment={assignment}
                       onToggle={handleToggleSubmitted}
                       disabled={isSaving}
+                      labels={t.assignments}
                     />
                   </td>
                   <td>
@@ -374,20 +380,22 @@ export function AssignmentsPage() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        있음
+                        {t.assignments.hasLink}
                       </a>
                     ) : (
-                      <span className={styles.helperInline}>없음</span>
+                      <span className={styles.helperInline}>{t.assignments.noLink}</span>
                     )}
                   </td>
-                  <td className={styles.filesCell}>{assignment.attachmentCount}개</td>
+                  <td className={styles.filesCell}>
+                    {t.assignments.fileCount.replace('{count}', String(assignment.attachmentCount))}
+                  </td>
                   <td>
                     <button
                       type="button"
                       className={styles.editButton}
                       onClick={() => openEditModal(assignment)}
                       disabled={isSaving}
-                      aria-label="과제 수정"
+                      aria-label={t.assignments.editAssignment}
                     >
                       <EditIcon className={styles.editIcon} />
                     </button>
@@ -398,7 +406,7 @@ export function AssignmentsPage() {
                       className={styles.deleteButton}
                       onClick={() => void handleDeleteAssignment(assignment)}
                       disabled={isSaving}
-                      aria-label="과제 삭제"
+                      aria-label={t.assignments.deleteAssignment}
                     >
                       ×
                     </button>

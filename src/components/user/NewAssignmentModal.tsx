@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useI18n } from '../../i18n/useI18n'
+import { recognizeImage, parseAssignmentText } from '../../lib/ocrParser'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
 import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
@@ -112,6 +114,7 @@ export function NewAssignmentModal({
   createAssignment,
   updateAssignment,
 }: NewAssignmentModalProps) {
+  const { t } = useI18n()
   const isEditMode = Boolean(assignment)
   const initialDateParts = getLocalDateParts(assignment?.dueDate)
 
@@ -132,6 +135,10 @@ export function NewAssignmentModal({
   const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [isScanning, setIsScanning] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   const resolvedSubjectId = subjectId || subjects[0]?.id || ''
   const { images: existingImages, files: existingFiles } = useMemo(
@@ -172,11 +179,50 @@ export function NewAssignmentModal({
     setRemovedAssetIds((currentIds) => [...new Set([...currentIds, assetId])])
   }
 
+  const handleDismissToast = useCallback(() => setToastMessage(null), [])
+
+  async function handleScreenshotScan(file: File) {
+    setIsScanning(true)
+    setError(null)
+
+    try {
+      const ocrText = await recognizeImage(file)
+      const parsed = parseAssignmentText(ocrText)
+
+      const hasAnyData = parsed.title || parsed.dueDate || parsed.description || parsed.externalLink
+      if (!hasAnyData) {
+        setToastMessage(t.modal.scanNoData)
+        setIsScanning(false)
+        return
+      }
+
+      if (parsed.title) setTitle(parsed.title)
+      if (parsed.dueDate) setDueDate(parsed.dueDate)
+      if (parsed.description) setDescription(parsed.description)
+      if (parsed.externalLink) setExternalLink(parsed.externalLink)
+
+      setToastMessage(t.modal.scanSuccess)
+    } catch {
+      setToastMessage(t.modal.scanFailed)
+    } finally {
+      setIsScanning(false)
+      if (scanInputRef.current) {
+        scanInputRef.current.value = ''
+      }
+    }
+  }
+
+  function onScanFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    void handleScreenshotScan(file)
+  }
+
   async function handleSubmit() {
     const dueDate = buildIsoDate(dateValue, hourValue, minuteValue, meridiem)
 
     if (!title.trim() || !dueDate || !resolvedSubjectId) {
-      setError('과목, 과제명, 마감일시는 필수입니다.')
+      setError(t.modal.requiredFields)
       return
     }
 
@@ -231,7 +277,7 @@ export function NewAssignmentModal({
         <header className={styles.header}>
           <div className={styles.headingBlock}>
             <h2 id="assignment-modal-title" className={styles.title}>
-              {isEditMode ? '과제 수정' : '새 과제 등록'}
+              {isEditMode ? t.modal.editTitle : t.modal.createTitle}
             </h2>
             <p className={styles.subtitle}>기본 정보와 첨부 파일을 한 번에 정리할 수 있어요.</p>
           </div>
@@ -277,7 +323,7 @@ export function NewAssignmentModal({
               </span>
               <input
                 type="text"
-                placeholder="예: 발표 자료 정리"
+                placeholder={t.modal.assignmentNamePlaceholder}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -365,7 +411,7 @@ export function NewAssignmentModal({
                 <span className={styles.characterCount}>({description.length}/{DESCRIPTION_MAX_LENGTH})</span>
               </span>
               <textarea
-                placeholder="과제에 대한 메모를 적어 두세요."
+                placeholder={t.modal.descriptionPlaceholder}
                 rows={4}
                 maxLength={DESCRIPTION_MAX_LENGTH}
                 value={description}
@@ -467,7 +513,7 @@ export function NewAssignmentModal({
               </div>
 
               {imageFiles.length === 0 && attachmentFiles.length === 0 ? (
-                <p className={styles.emptyText}>선택된 새 파일이 없습니다.</p>
+                <p className={styles.emptyText}>{t.modal.noNewFiles}</p>
               ) : (
                 <ul className={styles.assetList}>
                   {imageFiles.map((file, index) => (
@@ -484,7 +530,7 @@ export function NewAssignmentModal({
                         className={styles.deleteChip}
                         onClick={() => removeNewImage(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -500,7 +546,7 @@ export function NewAssignmentModal({
                         className={styles.deleteChip}
                         onClick={() => removeNewAttachment(index)}
                       >
-                        제거
+                        {t.modal.removeNew}
                       </button>
                     </li>
                   ))}
@@ -526,7 +572,7 @@ export function NewAssignmentModal({
           <div className={styles.footerButtons}>
             {error ? <p className={styles.errorText}>{error}</p> : null}
             <button className={styles.cancelButton} type="button" onClick={onClose}>
-              취소
+              {t.modal.cancel}
             </button>
             <button
               className={styles.saveButton}
@@ -538,6 +584,8 @@ export function NewAssignmentModal({
             </button>
           </div>
         </footer>
+
+        {toastMessage ? <Toast message={toastMessage} onDone={handleDismissToast} /> : null}
       </section>
     </div>
   )
