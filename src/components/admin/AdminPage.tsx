@@ -325,7 +325,7 @@ export function AdminPage() {
                             onClick={() => void handleDelete(entry)}
                             disabled={isSaving || entry.email === currentEmail}
                           >
-                            사용자 삭제
+                            삭제
                           </button>
                         ) : null}
                       </div>
