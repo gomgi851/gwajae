@@ -121,6 +121,11 @@ const translations = {
       create: '과제 등록',
       requiredFields: '과목, 과제명, 마감일시는 필수입니다.',
       storageFull: '선택한 파일 용량이 남은 저장공간을 초과했습니다. 남은 용량은 {amount}MB입니다.',
+      scanScreenshot: '스크린샷으로 입력',
+      scanning: '인식 중...',
+      scanSuccess: '인식된 내용을 입력해보았어요!',
+      scanFailed: '스크린샷에서 내용을 인식하지 못했어요. 직접 입력해 주세요.',
+      scanNoData: '인식된 정보가 없어요. 다른 스크린샷을 시도해 보세요.',
     },
     admin: {
       projectStorage: '프로젝트 저장 공간',
@@ -287,6 +292,11 @@ const translations = {
       create: 'Create',
       requiredFields: 'Subject, title, and due date are required.',
       storageFull: 'Selected files exceed remaining storage. Available: {amount}MB.',
+      scanScreenshot: 'Scan Screenshot',
+      scanning: 'Scanning...',
+      scanSuccess: 'Fields filled from the screenshot!',
+      scanFailed: 'Could not recognize the screenshot. Please enter manually.',
+      scanNoData: 'No data found. Try a different screenshot.',
     },
     admin: {
       projectStorage: 'Project Storage',

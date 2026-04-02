@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n } from '../../i18n/useI18n'
+import { recognizeImage, parseAssignmentText } from '../../lib/ocrParser'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
 import type { AssignmentFormInput } from '../../lib/assignments'
 import styles from './NewAssignmentModal.module.css'
@@ -135,6 +136,10 @@ export function NewAssignmentModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [isScanning, setIsScanning] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
+
   const resolvedSubjectId = subjectId || subjects[0]?.id || ''
   const { images: existingImages, files: existingFiles } = useMemo(
     () => splitAssets(assignment?.assets),
@@ -172,6 +177,45 @@ export function NewAssignmentModal({
 
   function markExistingAssetRemoved(assetId: string) {
     setRemovedAssetIds((currentIds) => [...new Set([...currentIds, assetId])])
+  }
+
+  const handleDismissToast = useCallback(() => setToastMessage(null), [])
+
+  async function handleScreenshotScan(file: File) {
+    setIsScanning(true)
+    setError(null)
+
+    try {
+      const ocrText = await recognizeImage(file)
+      const parsed = parseAssignmentText(ocrText)
+
+      const hasAnyData = parsed.title || parsed.dueDate || parsed.description || parsed.externalLink
+      if (!hasAnyData) {
+        setToastMessage(t.modal.scanNoData)
+        setIsScanning(false)
+        return
+      }
+
+      if (parsed.title) setTitle(parsed.title)
+      if (parsed.dueDate) setDueDate(parsed.dueDate)
+      if (parsed.description) setDescription(parsed.description)
+      if (parsed.externalLink) setExternalLink(parsed.externalLink)
+
+      setToastMessage(t.modal.scanSuccess)
+    } catch {
+      setToastMessage(t.modal.scanFailed)
+    } finally {
+      setIsScanning(false)
+      if (scanInputRef.current) {
+        scanInputRef.current.value = ''
+      }
+    }
+  }
+
+  function onScanFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    void handleScreenshotScan(file)
   }
 
   async function handleSubmit() {
@@ -540,6 +584,8 @@ export function NewAssignmentModal({
             </button>
           </div>
         </footer>
+
+        {toastMessage ? <Toast message={toastMessage} onDone={handleDismissToast} /> : null}
       </section>
     </div>
   )
