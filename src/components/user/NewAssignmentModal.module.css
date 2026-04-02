@@ -102,6 +102,7 @@
 
 .body {
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem 1.25rem;
 }
 
@@ -186,16 +187,19 @@
 }
 
 .timeRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: 5.2rem auto 5.2rem auto;
   align-items: center;
   gap: 0.45rem;
-  flex-wrap: nowrap;
+  justify-content: start;
+  max-width: 100%;
 }
 
-.timeInput {
+.field .timeInput {
   width: 5.2rem;
+  min-width: 0;
   text-align: center;
-  flex: 0 0 auto;
+  flex: 0 0 5.2rem;
 }
 
 .timeSeparator {
@@ -210,6 +214,7 @@
   border-radius: 0.7rem;
   overflow: hidden;
   flex: 0 0 auto;
+  justify-self: start;
 }
 
 .meridiemButton {
@@ -500,5 +505,14 @@
 
   .saveButton {
     width: 100%;
+  }
+
+  .timeRow {
+    grid-template-columns: 1fr auto 1fr auto;
+  }
+
+  .field .timeInput {
+    width: 100%;
+    flex-basis: auto;
   }
 }
