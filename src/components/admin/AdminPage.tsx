@@ -144,7 +144,17 @@ export function AdminPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <TopTabs items={adminTabs} />
+        <div className={styles.headerInner}>
+          <TopTabs items={adminTabs} />
+          <div className={styles.headerActions}>
+            <Link className={styles.appLinkButton} to="/">
+              일반 화면
+            </Link>
+            <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
+              로그아웃
+            </button>
+          </div>
+        </div>
       </header>
 
       <main className={styles.main}>
@@ -156,30 +166,22 @@ export function AdminPage() {
               <h1 className={styles.title}>사용자 관리</h1>
               <p className={styles.subtitle}>{user?.email ?? '관리자 계정'}</p>
             </div>
-            <div className={styles.sideControls}>
-              <div className={styles.inviteRow}>
-                <input
-                  className={styles.input}
-                  type="email"
-                  placeholder="허용할 구글 이메일을 입력해 주세요"
-                  aria-label="초대할 사용자 이메일"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                />
-                <button
-                  className={styles.inviteButton}
-                  type="button"
-                  onClick={() => void handleInvite()}
-                  disabled={isSaving}
-                >
-                  사용자 추가
-                </button>
-              </div>
-              <Link className={styles.appLinkButton} to="/">
-                일반 화면
-              </Link>
-              <button className={styles.signOutButton} type="button" onClick={() => void signOut()}>
-                로그아웃
+            <div className={styles.inviteRow}>
+              <input
+                className={styles.input}
+                type="email"
+                placeholder="허용할 구글 이메일을 입력해 주세요"
+                aria-label="초대할 사용자 이메일"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+              />
+              <button
+                className={styles.inviteButton}
+                type="button"
+                onClick={() => void handleInvite()}
+                disabled={isSaving}
+              >
+                사용자 추가
               </button>
             </div>
           </div>
