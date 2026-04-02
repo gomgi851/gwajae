@@ -30,6 +30,16 @@ function getDdayLabel(dueDate: string) {
   return `D+${Math.abs(diffDays)}`
 }
 
+function formatDueDetail(dueDate: string) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(dueDate))
+}
+
 function UsageCard({
   title,
   used,
@@ -70,16 +80,6 @@ function UsageCard({
   )
 }
 
-function formatDueDetail(dueDate: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(dueDate))
-}
-
 function sortAssignments(assignments: Assignment[]) {
   return [...assignments].sort((left, right) => {
     if (left.isFavorite !== right.isFavorite) {
@@ -115,6 +115,26 @@ function SubmittedToggle({
         {assignment.submitted ? '✓' : ''}
       </span>
     </button>
+  )
+}
+
+function PanelHeader({
+  title,
+  actionLabel,
+}: {
+  title: string
+  actionLabel: string
+}) {
+  return (
+    <div className={styles.panelHeader}>
+      <h1 className={styles.panelTitle}>{title}</h1>
+      <div className={styles.columnHeader} aria-hidden="true">
+        <span>과목</span>
+        <span>내용</span>
+        <span>D-day</span>
+        <span>{actionLabel}</span>
+      </div>
+    </div>
   )
 }
 
@@ -234,15 +254,7 @@ export function HomePage() {
       </div>
 
       <section className={`${styles.panel} ${styles.tallPanel}`}>
-        <div className={styles.panelHeader}>
-          <h1 className={styles.panelTitle}>다가오는 마감</h1>
-          <div className={styles.panelColumns} aria-hidden="true">
-            <span>과목</span>
-            <span>내용</span>
-            <span>D-day</span>
-            <span>제출</span>
-          </div>
-        </div>
+        <PanelHeader title="다가오는 마감" actionLabel="제출" />
 
         {isLoading ? <p className={styles.helperText}>과제 데이터를 불러오는 중입니다...</p> : null}
         {dataError ? <p className={styles.helperText}>{dataError}</p> : null}
@@ -269,15 +281,7 @@ export function HomePage() {
       </section>
 
       <section className={`${styles.panel} ${styles.bottomPanel}`}>
-        <div className={styles.panelHeader}>
-          <h1 className={styles.panelTitle}>고정한 과제</h1>
-          <div className={styles.panelColumns} aria-hidden="true">
-            <span>과목</span>
-            <span>내용</span>
-            <span>D-day</span>
-            <span>고정</span>
-          </div>
-        </div>
+        <PanelHeader title="고정한 과제" actionLabel="고정" />
 
         {!isLoading && !dataError ? (
           <ul className={styles.list}>

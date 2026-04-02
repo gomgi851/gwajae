@@ -38,16 +38,37 @@
 
 .cardTitle,
 .panelTitle {
-  margin: 0 0 1rem;
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1.12rem;
   font-weight: 700;
   color: #58718a;
 }
 
+.panelHeader {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.columnHeader {
+  display: grid;
+  grid-template-columns: minmax(5.4rem, 0.9fr) minmax(0, 2.2fr) minmax(4.4rem, 0.8fr) 2.4rem;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0 0.35rem 0.15rem;
+  color: #8ea0b0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.columnHeader span:last-child {
+  text-align: center;
+}
+
 .progressRing {
   --progress-angle: 244deg;
-
   width: 7.5rem;
   height: 7.5rem;
   margin: 0.6rem auto 1rem;
@@ -82,7 +103,8 @@
 
 .progressInner span,
 .usageLabel,
-.assignmentDetail {
+.assignmentDetail,
+.helperText {
   color: #98a8b7;
   font-size: 0.76rem;
 }
@@ -107,37 +129,52 @@
   list-style: none;
 }
 
-.listRow {
-  display: flex;
+.assignmentRow,
+.emptyRow {
+  display: grid;
+  grid-template-columns: minmax(5.4rem, 0.9fr) minmax(0, 2.2fr) minmax(4.4rem, 0.8fr) 2.4rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.95rem 0.5rem;
+  gap: 0.9rem;
+  padding: 0.95rem 0.35rem;
   border-top: 1px solid rgba(147, 163, 178, 0.14);
 }
 
-.listRow:first-child {
+.assignmentRow:first-child,
+.emptyRow:first-child {
   border-top: none;
-  padding-top: 0.2rem;
 }
 
-.rowMeta {
+.subjectCell,
+.ddayCell,
+.actionCell {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  min-width: 0;
+}
+
+.ddayCell {
+  justify-content: flex-start;
+}
+
+.actionCell {
+  justify-content: center;
 }
 
 .subjectPill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 4rem;
-  padding: 0.24rem 0.5rem;
+  width: 100%;
+  max-width: 6.4rem;
+  padding: 0.24rem 0.55rem;
   border-radius: 999px;
   color: #59728a;
   font-size: 0.7rem;
   font-weight: 700;
+  box-sizing: border-box;
+}
+
+.contentCell {
+  min-width: 0;
 }
 
 .assignmentName {
@@ -145,14 +182,25 @@
   color: #58718a;
   font-size: 0.92rem;
   font-weight: 700;
+  line-height: 1.35;
+  word-break: keep-all;
 }
 
 .assignmentDetail {
-  margin-top: 0.18rem;
+  margin: 0.18rem 0 0;
 }
 
-.rowButton {
-  display: none;
+.ddayBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.4rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(241, 196, 58, 0.14);
+  color: #8d7330;
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .statusButton {
@@ -200,10 +248,12 @@
   height: 1.2rem;
 }
 
+.emptyRow {
+  grid-template-columns: 1fr;
+}
+
 .helperText {
-  margin: -0.2rem 0 0;
-  color: #98a8b7;
-  font-size: 0.78rem;
+  margin: 0;
   line-height: 1.5;
 }
 
@@ -216,5 +266,39 @@
   .bottomPanel {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .columnHeader {
+    display: none;
+  }
+
+  .assignmentRow {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'subject action'
+      'content content'
+      'dday dday';
+    row-gap: 0.55rem;
+  }
+
+  .subjectCell {
+    grid-area: subject;
+  }
+
+  .contentCell {
+    grid-area: content;
+  }
+
+  .ddayCell {
+    grid-area: dday;
+  }
+
+  .actionCell {
+    grid-area: action;
+    justify-content: flex-end;
+  }
+
+  .emptyRow {
+    grid-template-columns: 1fr;
   }
 }
