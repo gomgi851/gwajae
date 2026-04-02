@@ -62,7 +62,9 @@ Deno.serve(async (request) => {
   } = await userClient.auth.getUser()
 
   if (requesterError || !requester?.email) {
-    return jsonResponse(401, { error: 'Unable to verify the current user.' })
+    return jsonResponse(401, {
+      error: `Unable to verify the current user: ${requesterError?.message ?? 'missing user email'}`,
+    })
   }
 
   const requesterEmail = requester.email.toLowerCase()
@@ -85,7 +87,7 @@ Deno.serve(async (request) => {
     .maybeSingle()
 
   if (targetError) {
-    return jsonResponse(400, { error: targetError.message })
+    return jsonResponse(400, { error: `allowed_users lookup failed: ${targetError.message}` })
   }
 
   if (!targetAllowedUser?.email) {
@@ -104,7 +106,7 @@ Deno.serve(async (request) => {
     const { data: authUsersData, error: listUsersError } = await serviceClient.auth.admin.listUsers()
 
     if (listUsersError) {
-      return jsonResponse(400, { error: listUsersError.message })
+      return jsonResponse(400, { error: `auth admin listUsers failed: ${listUsersError.message}` })
     }
 
     const matchedUser = authUsersData.users.find(
@@ -121,7 +123,7 @@ Deno.serve(async (request) => {
       .eq('owner_user_id', targetAuthUserId)
 
     if (assetError) {
-      return jsonResponse(400, { error: assetError.message })
+      return jsonResponse(400, { error: `assignment_assets lookup failed: ${assetError.message}` })
     }
 
     const storagePaths = (assetRows ?? [])
@@ -133,14 +135,14 @@ Deno.serve(async (request) => {
       const { error: removeError } = await serviceClient.storage.from(ASSIGNMENT_BUCKET).remove(batch)
 
       if (removeError) {
-        return jsonResponse(400, { error: removeError.message })
+        return jsonResponse(400, { error: `storage remove failed: ${removeError.message}` })
       }
     }
 
     const { error: deleteUserError } = await serviceClient.auth.admin.deleteUser(targetAuthUserId)
 
     if (deleteUserError) {
-      return jsonResponse(400, { error: deleteUserError.message })
+      return jsonResponse(400, { error: `auth admin deleteUser failed: ${deleteUserError.message}` })
     }
   }
 
@@ -150,7 +152,7 @@ Deno.serve(async (request) => {
     .eq('id', allowedUserId)
 
   if (deleteAllowedUserError) {
-    return jsonResponse(400, { error: deleteAllowedUserError.message })
+    return jsonResponse(400, { error: `allowed_users delete failed: ${deleteAllowedUserError.message}` })
   }
 
   return jsonResponse(200, {
