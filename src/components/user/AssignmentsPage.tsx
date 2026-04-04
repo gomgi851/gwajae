@@ -2,12 +2,23 @@ import { useMemo, useState } from 'react'
 import {
   createAssignmentWithAssets,
   deleteAssignment,
+  getAssignmentAssetDownloadUrl,
+  getAssignmentAssetPreviewKind,
+  getAssignmentAssetPreviewUrl,
   toggleAssignmentFlags,
   updateAssignmentWithAssets,
 } from '../../lib/assignments'
 import { createSubject } from '../../lib/subjects'
-import type { Assignment } from '../../types'
-import { EditIcon, PinIcon } from '../common/ActionIcons'
+import type { Assignment, AssignmentAsset } from '../../types'
+import {
+  DownloadIcon,
+  EditIcon,
+  FileStackIcon,
+  LinkIcon,
+  PinIcon,
+  PreviewIcon,
+} from '../common/ActionIcons'
+import { AssetPreviewModal } from './AssetPreviewModal'
 import { NewAssignmentModal } from './NewAssignmentModal'
 import { useUserWorkspace } from './useUserWorkspace'
 import styles from './AssignmentsPage.module.css'
@@ -170,6 +181,10 @@ export function AssignmentsPage() {
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
   const [subjectFilter, setSubjectFilter] = useState('all')
   const [isSaving, setIsSaving] = useState(false)
+  const [previewingAssetId, setPreviewingAssetId] = useState<string | null>(null)
+  const [previewAsset, setPreviewAsset] = useState<AssignmentAsset | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewDownloadUrl, setPreviewDownloadUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
@@ -238,6 +253,12 @@ export function AssignmentsPage() {
   }
 
   async function handleDeleteAssignment(assignment: Assignment) {
+    const shouldDelete = window.confirm(`'${assignment.title}' 과제를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)
+
+    if (!shouldDelete) {
+      return
+    }
+
     setIsSaving(true)
     setError(null)
 
@@ -254,6 +275,49 @@ export function AssignmentsPage() {
 
   async function handleSavedAssignment() {
     await refreshAll()
+  }
+
+  async function handleDownloadAsset(asset: AssignmentAsset) {
+    const { data, error: downloadError } = await getAssignmentAssetDownloadUrl(asset)
+
+    if (downloadError || !data) {
+      setError(downloadError?.message ?? '첨부 파일 다운로드 링크를 불러오지 못했습니다.')
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = data
+    link.download = asset.fileName
+    link.rel = 'noreferrer'
+    document.body.append(link)
+    link.click()
+    link.remove()
+  }
+
+  async function handlePreviewAsset(asset: AssignmentAsset) {
+    const previewKind = getAssignmentAssetPreviewKind(asset)
+
+    if (!previewKind) {
+      return
+    }
+
+    setPreviewingAssetId(asset.id)
+
+    const [{ data: nextPreviewUrl, error: previewError }, { data: nextDownloadUrl }] = await Promise.all([
+      getAssignmentAssetPreviewUrl(asset),
+      getAssignmentAssetDownloadUrl(asset),
+    ])
+
+    if (previewError || !nextPreviewUrl) {
+      setError(previewError?.message ?? '첨부 파일 미리보기를 불러오지 못했습니다.')
+      setPreviewingAssetId(null)
+      return
+    }
+
+    setPreviewAsset(asset)
+    setPreviewUrl(nextPreviewUrl)
+    setPreviewDownloadUrl(nextDownloadUrl ?? null)
+    setPreviewingAssetId(null)
   }
 
   function openCreateModal() {
@@ -388,14 +452,15 @@ export function AssignmentsPage() {
                       <a
                         className={
                           assignment.submitted
-                            ? `${styles.linkAnchor} ${styles.submittedInlineText}`
-                            : styles.linkAnchor
+                            ? `${styles.linkPill} ${styles.linkPillSubmitted}`
+                            : styles.linkPill
                         }
                         href={assignment.externalLink}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        있음
+                        <LinkIcon className={styles.inlineActionIcon} />
+                        <span>열기</span>
                       </a>
                     ) : (
                       <span
@@ -416,7 +481,52 @@ export function AssignmentsPage() {
                         : styles.filesCell
                     }
                   >
-                    {assignment.attachmentCount}개
+                    {assignment.attachmentCount > 0 && assignment.assets?.length ? (
+                      <div className={styles.filesPopoverShell}>
+                        <button type="button" className={styles.filesTrigger}>
+                          <FileStackIcon className={styles.inlineActionIcon} />
+                          <span>{assignment.attachmentCount}개</span>
+                        </button>
+                        <div className={styles.filesPopover}>
+                          <p className={styles.filesPopoverTitle}>첨부 파일</p>
+                          <ul className={styles.filesPopoverList}>
+                            {assignment.assets.map((asset) => (
+                              <li key={asset.id} className={styles.filesPopoverItem}>
+                                <div className={styles.filesPopoverInfo}>
+                                  <span className={styles.filesPopoverName}>{asset.fileName}</span>
+                                  <span className={styles.filesPopoverMeta}>
+                                    {asset.assetType === 'image' ? '이미지' : '파일'}
+                                  </span>
+                                </div>
+                                <div className={styles.filesPopoverActions}>
+                                  {getAssignmentAssetPreviewKind(asset) ? (
+                                    <button
+                                      type="button"
+                                      className={styles.filesIconButton}
+                                      onClick={() => void handlePreviewAsset(asset)}
+                                      disabled={previewingAssetId === asset.id}
+                                      aria-label={`${asset.fileName} 미리보기`}
+                                    >
+                                      <PreviewIcon className={styles.filesIcon} />
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className={styles.filesIconButton}
+                                    onClick={() => void handleDownloadAsset(asset)}
+                                    aria-label={`${asset.fileName} 다운로드`}
+                                  >
+                                    <DownloadIcon className={styles.filesIcon} />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      `${assignment.attachmentCount}개`
+                    )}
                   </td>
                   <td>
                     <button
@@ -463,6 +573,19 @@ export function AssignmentsPage() {
           )}
           createAssignment={createAssignmentWithAssets}
           updateAssignment={updateAssignmentWithAssets}
+        />
+      ) : null}
+
+      {previewAsset && previewUrl ? (
+        <AssetPreviewModal
+          asset={previewAsset}
+          previewUrl={previewUrl}
+          downloadUrl={previewDownloadUrl}
+          onClose={() => {
+            setPreviewAsset(null)
+            setPreviewUrl(null)
+            setPreviewDownloadUrl(null)
+          }}
         />
       ) : null}
 
