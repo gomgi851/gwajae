@@ -35,6 +35,30 @@ export interface Assignment {
   assets?: AssignmentAsset[]
 }
 
+export interface Exam {
+  id: string
+  subjectId: string
+  title: string
+  examAt: string
+  description?: string
+  subjectName?: string
+  subjectColor?: string
+}
+
+export interface ScheduleEvent {
+  id: string
+  title: string
+  startsAt: string
+  endsAt?: string | null
+  isAllDay: boolean
+  location?: string | null
+  note?: string
+  color: string
+  subjectId?: string | null
+  subjectName?: string
+  subjectColor?: string
+}
+
 export interface AllowedUser {
   id: string
   email: string

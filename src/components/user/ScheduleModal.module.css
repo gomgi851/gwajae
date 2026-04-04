@@ -1,0 +1,235 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+}
+
+.modal {
+  width: 90%;
+  max-width: 24rem;
+  background: white;
+  border-radius: 1.6rem;
+  box-shadow: 0 28px 80px rgba(93, 107, 120, 0.24);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  max-height: 98vh;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(221, 231, 238, 0.85);
+}
+
+.modalTitle {
+  margin: 0;
+  color: #58718a;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.closeButton {
+  border: none;
+  background: transparent;
+  color: #8ea0b0;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 140ms ease;
+}
+
+.closeButton:hover:not(:disabled) {
+  color: #58718a;
+}
+
+.closeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.error {
+  padding: 0.6rem;
+  border-radius: 0.8rem;
+  background: rgba(208, 122, 122, 0.1);
+  color: #c85a5a;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.formGroup {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.label {
+  color: #58718a;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.label input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.6rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(223, 232, 238, 0.94);
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #58718a;
+  transition: border-color 140ms ease;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: rgba(149, 173, 194, 0.98);
+  box-shadow: inset 0 0 0 2px rgba(149, 173, 194, 0.12);
+}
+
+.input:disabled,
+.textarea:disabled {
+  background: rgba(248, 251, 253, 0.6);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.colorPickerContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.colorPicker {
+  width: 3rem;
+  height: 2.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(223, 232, 238, 0.94);
+  cursor: pointer;
+}
+
+.colorPicker:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.colorValue {
+  color: #8ea0b0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.input[type='datetime-local'],
+.input[type='date'] {
+  font-size: 0.84rem;
+}
+
+.formActions {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.4rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(221, 231, 238, 0.85);
+}
+
+@media (max-width: 720px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .formActions {
+    gap: 0.55rem;
+  }
+}
+
+.cancelButton,
+.submitButton {
+  flex: 1;
+  padding: 0.65rem;
+  border-radius: 0.8rem;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.cancelButton {
+  background: rgba(248, 251, 253, 0.98);
+  color: #58718a;
+  box-shadow: inset 0 0 0 1px rgba(223, 232, 238, 0.94);
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: rgba(241, 246, 249, 0.98);
+  box-shadow: inset 0 0 0 1px rgba(206, 218, 228, 1);
+}
+
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitButton {
+  background: #58718a;
+  color: white;
+  box-shadow: 0 8px 20px rgba(88, 113, 138, 0.24);
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #4a5f78;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(88, 113, 138, 0.32);
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

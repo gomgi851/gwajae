@@ -121,3 +121,30 @@ export async function createSubject(name: string, color: string) {
 
   return { data: normalizeSubject(data), error: null }
 }
+
+export async function updateSubjectColor(subjectId: string, color: string) {
+  if (!supabase) {
+    return { data: null as Subject | null, error: null }
+  }
+
+  const normalizedSubjectId = subjectId.trim()
+  if (!normalizedSubjectId) {
+    return {
+      data: null as Subject | null,
+      error: new Error('과목을 선택해 주세요.'),
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('subjects')
+    .update({ color })
+    .eq('id', normalizedSubjectId)
+    .select('id,name,color,is_default')
+    .single()
+
+  if (error) {
+    return { data: null as Subject | null, error }
+  }
+
+  return { data: normalizeSubject(data), error: null }
+}

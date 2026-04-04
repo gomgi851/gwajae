@@ -8,8 +8,10 @@ import {
   toggleAssignmentFlags,
   updateAssignmentWithAssets,
 } from '../../lib/assignments'
-import { createSubject } from '../../lib/subjects'
-import type { Assignment, AssignmentAsset } from '../../types'
+import { deleteExam } from '../../lib/exams'
+import { deleteSchedule } from '../../lib/schedules'
+import { createSubject, updateSubjectColor } from '../../lib/subjects'
+import type { Assignment, AssignmentAsset, Exam, ScheduleEvent, Subject } from '../../types'
 import {
   DownloadIcon,
   EditIcon,
@@ -20,27 +22,79 @@ import {
 } from '../common/ActionIcons'
 import { AssetPreviewModal } from './AssetPreviewModal'
 import { NewAssignmentModal } from './NewAssignmentModal'
+import { ExamModal } from './ExamModal'
+import { ScheduleModal } from './ScheduleModal'
 import { useUserWorkspace } from './useUserWorkspace'
 import styles from './AssignmentsPage.module.css'
 
 const pastelOptions = [
-  '#f3afc9',
-  '#a9dfe4',
-  '#f5d295',
-  '#ddc0f3',
+  '#f8c6d8',
+  '#f5bdd0',
+  '#f2b6ca',
+  '#f7c8b8',
+  '#f6d2b4',
+  '#f5ddb0',
+  '#f6e8b8',
+  '#e7efb6',
+  '#d8eab7',
+  '#cbe6bf',
+  '#bfe6cd',
+  '#b7e7d8',
+  '#b4e4e3',
+  '#b7dff0',
+  '#bfd8f4',
+  '#c8d2f5',
+  '#d6c9f3',
+  '#e2c6ef',
+  '#e7ccdd',
   '#d7dee7',
-  '#c7ebd6',
-  '#f7cdb8',
-  '#d0daf5',
 ]
 
 const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토']
 
 type ViewMode = 'table' | 'calendar'
+type ItemTypeFilter = 'all' | 'assignment' | 'exam' | 'schedule'
+type DDayState = 'today' | 'urgent' | 'past' | 'normal'
+type TimelineRow =
+  | { kind: 'assignment'; sortDate: string; isFavorite: boolean; assignment: Assignment }
+  | { kind: 'exam'; sortDate: string; isFavorite: boolean; exam: Exam }
+  | { kind: 'schedule'; sortDate: string; isFavorite: boolean; schedule: ScheduleEvent }
+
+const EXAM_PIN_STORAGE_KEY = 'gwajae:pinned-exams'
+const SCHEDULE_PIN_STORAGE_KEY = 'gwajae:pinned-schedules'
+
+function readPinnedIds(storageKey: string) {
+  if (typeof window === 'undefined') {
+    return [] as string[]
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(storageKey)
+    if (!rawValue) {
+      return [] as string[]
+    }
+
+    const parsed = JSON.parse(rawValue)
+    if (!Array.isArray(parsed)) {
+      return [] as string[]
+    }
+
+    return parsed.filter((id): id is string => typeof id === 'string')
+  } catch {
+    return [] as string[]
+  }
+}
+
+function writePinnedIds(storageKey: string, ids: string[]) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(storageKey, JSON.stringify(ids))
+}
 
 function formatDueDate(isoDate: string) {
   return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
@@ -54,6 +108,60 @@ function formatMonthLabel(date: Date) {
     year: 'numeric',
     month: 'long',
   }).format(date)
+}
+
+function formatDDay(isoDate: string) {
+  const target = new Date(isoDate)
+  const now = new Date()
+  const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) {
+    return 'D-Day'
+  }
+
+  return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`
+}
+
+function getDDayState(isoDate: string): DDayState {
+  const target = new Date(isoDate)
+  const now = new Date()
+  const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) {
+    return 'today'
+  }
+
+  if (diffDays < 0) {
+    return 'past'
+  }
+
+  if (diffDays <= 3) {
+    return 'urgent'
+  }
+
+  return 'normal'
+}
+
+function getDDayClassName(isoDate: string) {
+  const state = getDDayState(isoDate)
+
+  if (state === 'today') {
+    return styles.dDayToday
+  }
+
+  if (state === 'urgent') {
+    return styles.dDayUrgent
+  }
+
+  if (state === 'past') {
+    return styles.dDayPast
+  }
+
+  return styles.dDayNormal
 }
 
 function sortAssignments(assignments: Assignment[]) {
@@ -117,6 +225,46 @@ function buildAssignmentsByDate(assignments: Assignment[]) {
       grouped[key] = []
     }
     grouped[key].push(assignment)
+    return grouped
+  }, {})
+}
+
+function buildExamsByDate(exams: Exam[]) {
+  return exams.reduce<Record<string, Exam[]>>((grouped, exam) => {
+    const key = getDateKey(new Date(exam.examAt))
+    if (!grouped[key]) {
+      grouped[key] = []
+    }
+    grouped[key].push(exam)
+    return grouped
+  }, {})
+}
+
+function buildSchedulesByDate(schedules: ScheduleEvent[]) {
+  return schedules.reduce<Record<string, ScheduleEvent[]>>((grouped, schedule) => {
+    const startDate = new Date(schedule.startsAt)
+    const endDate = schedule.endsAt ? new Date(schedule.endsAt) : startDate
+
+    // 일정이 하루종일이면 endDate를 자정으로 설정
+    if (schedule.isAllDay && schedule.endsAt) {
+      endDate.setHours(0, 0, 0, 0)
+    }
+
+    // 시작일부터 종료일까지 각 날짜에 일정 추가
+    const currentDate = new Date(startDate)
+    currentDate.setHours(0, 0, 0, 0)
+    endDate.setHours(0, 0, 0, 0)
+
+    while (currentDate <= endDate) {
+      const key = getDateKey(currentDate)
+      if (!grouped[key]) {
+        grouped[key] = []
+      }
+      grouped[key].push(schedule)
+
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+
     return grouped
   }, {})
 }
@@ -239,6 +387,102 @@ function NewSubjectModal({ onClose, onCreate, isSaving }: NewSubjectModalProps) 
   )
 }
 
+interface SubjectColorModalProps {
+  subjects: Subject[]
+  onClose: () => void
+  onUpdate: (subjectId: string, color: string) => Promise<void>
+  isSaving: boolean
+}
+
+function SubjectColorModal({ subjects, onClose, onUpdate, isSaving }: SubjectColorModalProps) {
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? '')
+  const [color, setColor] = useState(subjects[0]?.color ?? pastelOptions[0])
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleUpdate() {
+    if (!subjectId) {
+      setError('과목을 먼저 선택해 주세요.')
+      return
+    }
+
+    setError(null)
+    await onUpdate(subjectId, color)
+  }
+
+  return (
+    <div className={styles.overlay} role="presentation" onClick={onClose}>
+      <section
+        className={styles.subjectModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-subject-color-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className={styles.subjectModalHeader}>
+          <h2 id="edit-subject-color-title" className={styles.subjectModalTitle}>
+            과목 색상 변경
+          </h2>
+          <button className={styles.closeButton} onClick={onClose} aria-label="과목 색상 모달 닫기">
+            ×
+          </button>
+        </header>
+
+        <label className={styles.subjectField}>
+          <span>과목</span>
+          <select
+            value={subjectId}
+            onChange={(event) => {
+              const nextId = event.target.value
+              setSubjectId(nextId)
+              const selectedSubject = subjects.find((subject) => subject.id === nextId)
+              if (selectedSubject) {
+                setColor(selectedSubject.color)
+              }
+            }}
+          >
+            {subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className={styles.subjectField}>
+          <span>색상</span>
+          <div className={styles.colorGrid}>
+            {pastelOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={
+                  option === color
+                    ? `${styles.colorSwatch} ${styles.colorSwatchActive}`
+                    : styles.colorSwatch
+                }
+                style={{ backgroundColor: option }}
+                onClick={() => setColor(option)}
+                aria-label={`색상 ${option} 선택`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {error ? <p className={styles.errorText}>{error}</p> : null}
+
+        <button
+          className={styles.createSubjectButton}
+          type="button"
+          onClick={() => void handleUpdate()}
+          disabled={isSaving}
+        >
+          색상 저장
+        </button>
+      </section>
+    </div>
+  )
+}
+
 function AttachmentListModal({
   assignment,
   previewingAssetId,
@@ -322,14 +566,24 @@ function AttachmentListModal({
 function CalendarDayModal({
   date,
   assignments,
+  exams,
+  schedules,
   onClose,
   onOpenAssignment,
+  onOpenExam,
+  onOpenSchedule,
 }: {
   date: Date
   assignments: Assignment[]
+  exams: Exam[]
+  schedules: ScheduleEvent[]
   onClose: () => void
   onOpenAssignment: (assignment: Assignment) => void
+  onOpenExam: (exam: Exam) => void
+  onOpenSchedule: (schedule: ScheduleEvent) => void
 }) {
+  const allItems = [...assignments, ...exams, ...schedules]
+
   return (
     <div className={styles.overlay} role="presentation" onClick={onClose}>
       <section
@@ -348,7 +602,7 @@ function CalendarDayModal({
                 weekday: 'long',
               }).format(date)}
             </h2>
-            <p className={styles.attachmentsModalDescription}>{assignments.length}개의 일정</p>
+            <p className={styles.attachmentsModalDescription}>{allItems.length}개의 일정</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="일정 상세 닫기">
             ×
@@ -359,6 +613,9 @@ function CalendarDayModal({
           {assignments.map((assignment) => (
             <li key={assignment.id} className={styles.attachmentRow}>
               <div className={styles.attachmentInfo}>
+                <span className={styles.itemType} style={{ backgroundColor: '#a8d5ff' }}>
+                  과제
+                </span>
                 <span
                   className={styles.subjectPill}
                   style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
@@ -380,6 +637,62 @@ function CalendarDayModal({
               </div>
             </li>
           ))}
+
+          {exams.map((exam) => (
+            <li key={exam.id} className={styles.attachmentRow}>
+              <div className={styles.attachmentInfo}>
+                <span className={styles.itemType} style={{ backgroundColor: '#ffd6e0' }}>
+                  시험
+                </span>
+                <span
+                  className={styles.subjectPill}
+                  style={{ backgroundColor: exam.subjectColor ?? '#d7dee7' }}
+                >
+                  {exam.subjectName ?? '미지정'}
+                </span>
+                <span className={styles.attachmentName}>{exam.title}</span>
+                <span className={styles.attachmentMeta}>{formatDueDate(exam.examAt)}</span>
+              </div>
+              <div className={styles.attachmentActions}>
+                <button
+                  type="button"
+                  className={styles.filesIconButton}
+                  onClick={() => onOpenExam(exam)}
+                  aria-label={`${exam.title} 상세 열기`}
+                >
+                  <EditIcon className={styles.filesIcon} />
+                </button>
+              </div>
+            </li>
+          ))}
+
+          {schedules.map((schedule) => (
+            <li key={schedule.id} className={styles.attachmentRow}>
+              <div className={styles.attachmentInfo}>
+                <span className={styles.itemType} style={{ backgroundColor: '#9bb4c8' }}>
+                  일정
+                </span>
+                <span
+                  className={styles.subjectPill}
+                  style={{ backgroundColor: schedule.subjectColor ?? '#d7dee7' }}
+                >
+                  {schedule.subjectName ?? '미지정'}
+                </span>
+                <span className={styles.attachmentName}>{schedule.title}</span>
+                <span className={styles.attachmentMeta}>{formatDueDate(schedule.startsAt)}</span>
+              </div>
+              <div className={styles.attachmentActions}>
+                <button
+                  type="button"
+                  className={styles.filesIconButton}
+                  onClick={() => onOpenSchedule(schedule)}
+                  aria-label={`${schedule.title} 상세 열기`}
+                >
+                  <EditIcon className={styles.filesIcon} />
+                </button>
+              </div>
+            </li>
+          ))}
         </ul>
       </section>
     </div>
@@ -387,12 +700,18 @@ function CalendarDayModal({
 }
 
 export function AssignmentsPage() {
-  const { assignments, subjects, storageSummary, isLoading, dataError, refreshAll } =
+  const { assignments, exams, schedules, subjects, storageSummary, isLoading, dataError, refreshAll } =
     useUserWorkspace()
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false)
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
+  const [isSubjectColorModalOpen, setIsSubjectColorModalOpen] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
+  const [editingExam, setEditingExam] = useState<Exam | null>(null)
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleEvent | null>(null)
   const [subjectFilter, setSubjectFilter] = useState('all')
+  const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>('all')
   const [isSaving, setIsSaving] = useState(false)
   const [previewingAssetId, setPreviewingAssetId] = useState<string | null>(null)
   const [previewAsset, setPreviewAsset] = useState<AssignmentAsset | null>(null)
@@ -400,23 +719,104 @@ export function AssignmentsPage() {
   const [previewDownloadUrl, setPreviewDownloadUrl] = useState<string | null>(null)
   const [attachmentsAssignment, setAttachmentsAssignment] = useState<Assignment | null>(null)
   const [deletingAssignment, setDeletingAssignment] = useState<Assignment | null>(null)
+  const [deletingExam, setDeletingExam] = useState<Exam | null>(null)
+  const [deletingSchedule, setDeletingSchedule] = useState<ScheduleEvent | null>(null)
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(assignments))
+  const [pinnedExamIds, setPinnedExamIds] = useState<string[]>(() => readPinnedIds(EXAM_PIN_STORAGE_KEY))
+  const [pinnedScheduleIds, setPinnedScheduleIds] = useState<string[]>(() => readPinnedIds(SCHEDULE_PIN_STORAGE_KEY))
 
   const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
   const filteredAssignments = useMemo(() => {
+    if (itemTypeFilter !== 'all' && itemTypeFilter !== 'assignment') {
+      return []
+    }
+
     if (subjectFilter === 'all') {
       return sortedAssignments
     }
 
     return sortedAssignments.filter((assignment) => assignment.subjectId === subjectFilter)
-  }, [sortedAssignments, subjectFilter])
+  }, [sortedAssignments, subjectFilter, itemTypeFilter])
+
+  const filteredExams = useMemo(() => {
+    if (itemTypeFilter !== 'all' && itemTypeFilter !== 'exam') {
+      return []
+    }
+
+    if (subjectFilter === 'all') {
+      return exams
+    }
+
+    return exams.filter((exam) => exam.subjectId === subjectFilter)
+  }, [exams, subjectFilter, itemTypeFilter])
+
+  const sortedExams = useMemo(() => {
+    return [...filteredExams].sort((left, right) => {
+      return new Date(left.examAt).getTime() - new Date(right.examAt).getTime()
+    })
+  }, [filteredExams])
+
+  const filteredSchedules = useMemo(() => {
+    if (itemTypeFilter !== 'all' && itemTypeFilter !== 'schedule') {
+      return []
+    }
+
+    if (subjectFilter === 'all') {
+      return schedules
+    }
+
+    return schedules.filter((schedule) => schedule.subjectId === subjectFilter)
+  }, [schedules, subjectFilter, itemTypeFilter])
+
+  const sortedSchedules = useMemo(() => {
+    return [...filteredSchedules].sort((left, right) => {
+      return new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime()
+    })
+  }, [filteredSchedules])
+
+  const timelineRows = useMemo(() => {
+    const assignmentRows: TimelineRow[] = filteredAssignments.map((assignment) => ({
+      kind: 'assignment',
+      sortDate: assignment.dueDate,
+      isFavorite: assignment.isFavorite,
+      assignment,
+    }))
+    const examRows: TimelineRow[] = sortedExams.map((exam) => ({
+      kind: 'exam',
+      sortDate: exam.examAt,
+      isFavorite: pinnedExamIds.includes(exam.id),
+      exam,
+    }))
+    const scheduleRows: TimelineRow[] = sortedSchedules.map((schedule) => ({
+      kind: 'schedule',
+      sortDate: schedule.startsAt,
+      isFavorite: pinnedScheduleIds.includes(schedule.id),
+      schedule,
+    }))
+
+    return [...assignmentRows, ...examRows, ...scheduleRows].sort((left, right) => {
+      if (left.isFavorite !== right.isFavorite) {
+        return Number(right.isFavorite) - Number(left.isFavorite)
+      }
+
+      return new Date(left.sortDate).getTime() - new Date(right.sortDate).getTime()
+    })
+  }, [filteredAssignments, sortedExams, sortedSchedules, pinnedExamIds, pinnedScheduleIds])
 
   const assignmentsByDate = useMemo(
     () => buildAssignmentsByDate(filteredAssignments),
     [filteredAssignments],
+  )
+  const examsByDate = useMemo(
+    () => buildExamsByDate(sortedExams),
+    [sortedExams],
+  )
+  const schedulesByDate = useMemo(
+    () => buildSchedulesByDate(sortedSchedules),
+    [sortedSchedules],
   )
   const calendarCells = useMemo(() => getCalendarCells(calendarMonth), [calendarMonth])
   const selectedDateAssignments = useMemo(() => {
@@ -426,6 +826,22 @@ export function AssignmentsPage() {
 
     return assignmentsByDate[getDateKey(selectedCalendarDate)] ?? []
   }, [assignmentsByDate, selectedCalendarDate])
+
+  const selectedDateExams = useMemo(() => {
+    if (!selectedCalendarDate) {
+      return []
+    }
+
+    return examsByDate[getDateKey(selectedCalendarDate)] ?? []
+  }, [examsByDate, selectedCalendarDate])
+
+  const selectedDateSchedules = useMemo(() => {
+    if (!selectedCalendarDate) {
+      return []
+    }
+
+    return schedulesByDate[getDateKey(selectedCalendarDate)] ?? []
+  }, [schedulesByDate, selectedCalendarDate])
 
   async function handleCreateSubject(name: string, color: string) {
     setIsSaving(true)
@@ -444,6 +860,22 @@ export function AssignmentsPage() {
 
     setIsSaving(false)
     setIsSubjectModalOpen(false)
+    await refreshAll()
+  }
+
+  async function handleUpdateSubjectColor(subjectId: string, color: string) {
+    setIsSaving(true)
+    setError(null)
+
+    const { error: updateError } = await updateSubjectColor(subjectId, color)
+    if (updateError) {
+      setError(updateError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setIsSaving(false)
+    setIsSubjectColorModalOpen(false)
     await refreshAll()
   }
 
@@ -481,6 +913,26 @@ export function AssignmentsPage() {
     await refreshAll()
   }
 
+  function handleToggleExamFavorite(exam: Exam) {
+    setPinnedExamIds((current) => {
+      const next = current.includes(exam.id)
+        ? current.filter((id) => id !== exam.id)
+        : [...current, exam.id]
+      writePinnedIds(EXAM_PIN_STORAGE_KEY, next)
+      return next
+    })
+  }
+
+  function handleToggleScheduleFavorite(schedule: ScheduleEvent) {
+    setPinnedScheduleIds((current) => {
+      const next = current.includes(schedule.id)
+        ? current.filter((id) => id !== schedule.id)
+        : [...current, schedule.id]
+      writePinnedIds(SCHEDULE_PIN_STORAGE_KEY, next)
+      return next
+    })
+  }
+
   async function confirmDeleteAssignment() {
     if (!deletingAssignment) {
       return
@@ -497,6 +949,46 @@ export function AssignmentsPage() {
     }
 
     setDeletingAssignment(null)
+    setIsSaving(false)
+    await refreshAll()
+  }
+
+  async function confirmDeleteExam() {
+    if (!deletingExam) {
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+    const { error: deleteError } = await deleteExam(deletingExam.id)
+
+    if (deleteError) {
+      setError(deleteError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setDeletingExam(null)
+    setIsSaving(false)
+    await refreshAll()
+  }
+
+  async function confirmDeleteSchedule() {
+    if (!deletingSchedule) {
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+    const { error: deleteError } = await deleteSchedule(deletingSchedule.id)
+
+    if (deleteError) {
+      setError(deleteError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setDeletingSchedule(null)
     setIsSaving(false)
     await refreshAll()
   }
@@ -558,6 +1050,22 @@ export function AssignmentsPage() {
     setIsAssignmentModalOpen(true)
   }
 
+  function openEditExamModal(exam: Exam) {
+    setEditingExam(exam)
+    setSelectedCalendarDate(null)
+    setIsExamModalOpen(true)
+  }
+
+  function openEditScheduleModal(schedule: ScheduleEvent) {
+    setEditingSchedule(schedule)
+    setSelectedCalendarDate(null)
+    setIsScheduleModalOpen(true)
+  }
+
+  function openCalendarDay(cellDate: Date) {
+    setSelectedCalendarDate(cellDate)
+  }
+
   function openAttachmentsModal(assignment: Assignment) {
     if (!assignment.assets?.length) {
       return
@@ -598,6 +1106,53 @@ export function AssignmentsPage() {
             </div>
           </div>
 
+          <div className={styles.filterButtons}>
+            <button
+              type="button"
+              className={
+                itemTypeFilter === 'all'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setItemTypeFilter('all')}
+            >
+              전체
+            </button>
+            <button
+              type="button"
+              className={
+                itemTypeFilter === 'assignment'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setItemTypeFilter('assignment')}
+            >
+              과제
+            </button>
+            <button
+              type="button"
+              className={
+                itemTypeFilter === 'exam'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setItemTypeFilter('exam')}
+            >
+              시험
+            </button>
+            <button
+              type="button"
+              className={
+                itemTypeFilter === 'schedule'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setItemTypeFilter('schedule')}
+            >
+              일정
+            </button>
+          </div>
+
           <div className={styles.actions}>
             <label className={styles.selectShell}>
               <span className={styles.visuallyHidden}>과목별 필터</span>
@@ -617,8 +1172,35 @@ export function AssignmentsPage() {
             >
               + 과목
             </button>
+            <button
+              className={styles.ghostButton}
+              type="button"
+              onClick={() => setIsSubjectColorModalOpen(true)}
+            >
+              과목 색상
+            </button>
             <button className={styles.primaryButton} type="button" onClick={openCreateModal}>
               과제 추가
+            </button>
+            <button
+              className={styles.primaryButton}
+              type="button"
+              onClick={() => {
+                setEditingExam(null)
+                setIsExamModalOpen(true)
+              }}
+            >
+              시험 추가
+            </button>
+            <button
+              className={styles.primaryButton}
+              type="button"
+              onClick={() => {
+                setEditingSchedule(null)
+                setIsScheduleModalOpen(true)
+              }}
+            >
+              일정 추가
             </button>
           </div>
         </div>
@@ -632,9 +1214,11 @@ export function AssignmentsPage() {
             <table className={styles.table}>
               <colgroup>
                 <col className={styles.colPin} />
+                <col className={styles.colKind} />
                 <col className={styles.colSubject} />
                 <col className={styles.colTitle} />
                 <col className={styles.colDueDate} />
+                <col className={styles.colDday} />
                 <col className={styles.colSubmitted} />
                 <col className={styles.colLink} />
                 <col className={styles.colFiles} />
@@ -644,9 +1228,11 @@ export function AssignmentsPage() {
               <thead>
                 <tr>
                   <th>고정</th>
+                  <th>종류</th>
                   <th>과목</th>
                   <th>과제명</th>
                   <th>마감일시</th>
+                  <th>D-day</th>
                   <th>제출</th>
                   <th>링크</th>
                   <th>파일</th>
@@ -655,120 +1241,284 @@ export function AssignmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {!isLoading && filteredAssignments.length === 0 ? (
+                {!isLoading && timelineRows.length === 0 ? (
                   <tr>
-                    <td className={styles.emptyState} colSpan={9}>
-                      현재 필터에 맞는 과제가 없습니다.
+                    <td className={styles.emptyState} colSpan={11}>
+                      현재 필터에 맞는 항목이 없습니다.
                     </td>
                   </tr>
                 ) : null}
 
-                {filteredAssignments.map((assignment) => (
-                  <tr key={assignment.id} className={getAssignmentRowClassName(assignment)}>
-                    <td>
-                      <button
-                        type="button"
-                        className={assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted}
-                        onClick={() => void handleToggleFavorite(assignment)}
-                        disabled={isSaving}
-                        aria-label={assignment.isFavorite ? '고정 해제' : '맨 위로 고정'}
-                      >
-                        <PinIcon className={styles.pinIcon} />
-                      </button>
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          assignment.submitted
-                            ? `${styles.subjectPill} ${styles.submittedSubjectPill}`
-                            : styles.subjectPill
-                        }
-                        style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
-                      >
-                        {assignment.subjectName ?? '미지정'}
-                      </span>
-                    </td>
-                    <td className={assignment.submitted ? styles.titleCellSubmitted : styles.titleCell}>
-                      <div className={styles.titleStack}>
-                        <span>{assignment.title}</span>
-                        {assignment.submitted ? <span className={styles.submittedBadge}>제출 완료</span> : null}
-                      </div>
-                    </td>
-                    <td className={assignment.submitted ? styles.dateCellSubmitted : styles.dateCell}>
-                      {formatDueDate(assignment.dueDate)}
-                    </td>
-                    <td>
-                      <SubmittedToggle
-                        assignment={assignment}
-                        onToggle={handleToggleSubmitted}
-                        disabled={isSaving}
-                      />
-                    </td>
-                    <td>
-                      {assignment.externalLink ? (
-                        <a
-                          className={
-                            assignment.submitted
-                              ? `${styles.linkPill} ${styles.linkPillSubmitted}`
-                              : styles.linkPill
-                          }
-                          href={assignment.externalLink}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <LinkIcon className={styles.inlineActionIcon} />
-                          <span>열기</span>
-                        </a>
-                      ) : (
-                        <span
-                          className={
-                            assignment.submitted
-                              ? `${styles.helperInline} ${styles.submittedInlineText}`
-                              : styles.helperInline
-                          }
-                        >
-                          없음
-                        </span>
-                      )}
-                    </td>
-                    <td className={assignment.submitted ? styles.submittedInlineText : undefined}>
-                      {assignment.attachmentCount > 0 ? (
+                {timelineRows.map((row) => {
+                  if (row.kind === 'assignment') {
+                    const { assignment } = row
+
+                    return (
+                      <tr key={`assignment-${assignment.id}`} className={getAssignmentRowClassName(assignment)}>
+                        <td>
+                          <button
+                            type="button"
+                            className={assignment.isFavorite ? styles.favoriteActive : styles.favoriteMuted}
+                            onClick={() => void handleToggleFavorite(assignment)}
+                            disabled={isSaving}
+                            aria-label={assignment.isFavorite ? '고정 해제' : '맨 위로 고정'}
+                          >
+                            <PinIcon className={styles.pinIcon} />
+                          </button>
+                        </td>
+                        <td>
+                          <span className={styles.subjectPill} style={{ backgroundColor: '#d7dee7' }}>
+                            과제
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              assignment.submitted
+                                ? `${styles.subjectPill} ${styles.submittedSubjectPill}`
+                                : styles.subjectPill
+                            }
+                            style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
+                          >
+                            {assignment.subjectName ?? '미지정'}
+                          </span>
+                        </td>
+                        <td className={assignment.submitted ? styles.titleCellSubmitted : styles.titleCell}>
+                          <span>{assignment.title}</span>
+                        </td>
+                        <td className={assignment.submitted ? styles.dateCellSubmitted : styles.dateCell}>
+                          {formatDueDate(assignment.dueDate)}
+                        </td>
+                        <td>
+                          <span className={`${styles.dDayBadge} ${getDDayClassName(assignment.dueDate)}`}>
+                            {formatDDay(assignment.dueDate)}
+                          </span>
+                        </td>
+                        <td>
+                          <SubmittedToggle
+                            assignment={assignment}
+                            onToggle={handleToggleSubmitted}
+                            disabled={isSaving}
+                          />
+                        </td>
+                        <td>
+                          {assignment.externalLink ? (
+                            <a
+                              className={
+                                assignment.submitted
+                                  ? `${styles.linkPill} ${styles.linkPillSubmitted}`
+                                  : styles.linkPill
+                              }
+                              href={assignment.externalLink}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <LinkIcon className={styles.inlineActionIcon} />
+                              <span>열기</span>
+                            </a>
+                          ) : (
+                            <span
+                              className={
+                                assignment.submitted
+                                  ? `${styles.helperInline} ${styles.submittedInlineText}`
+                                  : styles.helperInline
+                              }
+                            >
+                              없음
+                            </span>
+                          )}
+                        </td>
+                        <td className={assignment.submitted ? styles.submittedInlineText : undefined}>
+                          {assignment.attachmentCount > 0 ? (
+                            <button
+                              type="button"
+                              className={styles.filesTrigger}
+                              onClick={() => openAttachmentsModal(assignment)}
+                            >
+                              <FileStackIcon className={styles.inlineActionIcon} />
+                              <span>{formatAssetCountLabel(assignment.attachmentCount)}</span>
+                            </button>
+                          ) : (
+                            <span className={styles.helperInline}>0개</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.editButton}
+                            onClick={() => openEditModal(assignment)}
+                            disabled={isSaving}
+                            aria-label="과제 수정"
+                          >
+                            <EditIcon className={styles.editIcon} />
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.deleteButton}
+                            onClick={() => setDeletingAssignment(assignment)}
+                            disabled={isSaving}
+                            aria-label="과제 삭제"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  if (row.kind === 'exam') {
+                    const { exam } = row
+                    const isExamPinned = row.isFavorite
+
+                    return (
+                      <tr key={`exam-${exam.id}`}>
+                        <td>
+                          <button
+                            type="button"
+                            className={isExamPinned ? styles.favoriteActive : styles.favoriteMuted}
+                            onClick={() => handleToggleExamFavorite(exam)}
+                            disabled={isSaving}
+                            aria-label={isExamPinned ? '고정 해제' : '맨 위로 고정'}
+                          >
+                            <PinIcon className={styles.pinIcon} />
+                          </button>
+                        </td>
+                        <td>
+                          <span className={styles.subjectPill} style={{ backgroundColor: '#ffd6e0' }}>
+                            시험
+                          </span>
+                        </td>
+                        <td>
+                          <span className={styles.subjectPill} style={{ backgroundColor: exam.subjectColor ?? '#d7dee7' }}>
+                            {exam.subjectName ?? '미지정'}
+                          </span>
+                        </td>
+                        <td className={styles.titleCell}>
+                          <div className={styles.titleStack}>
+                            <span>{exam.title}</span>
+                          </div>
+                        </td>
+                        <td className={styles.dateCell}>
+                          {formatDueDate(exam.examAt)}
+                        </td>
+                        <td>
+                          <span className={`${styles.dDayBadge} ${getDDayClassName(exam.examAt)}`}>
+                            {formatDDay(exam.examAt)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={styles.helperInline}>-</span>
+                        </td>
+                        <td>
+                          <span className={styles.helperInline}>-</span>
+                        </td>
+                        <td>
+                          <span className={styles.helperInline}>-</span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.editButton}
+                            onClick={() => openEditExamModal(exam)}
+                            disabled={isSaving}
+                            aria-label="시험 수정"
+                          >
+                            <EditIcon className={styles.editIcon} />
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.deleteButton}
+                            onClick={() => setDeletingExam(exam)}
+                            disabled={isSaving}
+                            aria-label="시험 삭제"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  const { schedule } = row
+                  const isSchedulePinned = row.isFavorite
+
+                  return (
+                    <tr key={`schedule-${schedule.id}`}>
+                      <td>
                         <button
                           type="button"
-                          className={styles.filesTrigger}
-                          onClick={() => openAttachmentsModal(assignment)}
+                          className={isSchedulePinned ? styles.favoriteActive : styles.favoriteMuted}
+                          onClick={() => handleToggleScheduleFavorite(schedule)}
+                          disabled={isSaving}
+                          aria-label={isSchedulePinned ? '고정 해제' : '맨 위로 고정'}
                         >
-                          <FileStackIcon className={styles.inlineActionIcon} />
-                          <span>{formatAssetCountLabel(assignment.attachmentCount)}</span>
+                          <PinIcon className={styles.pinIcon} />
                         </button>
-                      ) : (
-                        <span className={styles.helperInline}>0개</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.editButton}
-                        onClick={() => openEditModal(assignment)}
-                        disabled={isSaving}
-                        aria-label="과제 수정"
-                      >
-                        <EditIcon className={styles.editIcon} />
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.deleteButton}
-                        onClick={() => setDeletingAssignment(assignment)}
-                        disabled={isSaving}
-                        aria-label="과제 삭제"
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>
+                        <span className={styles.subjectPill} style={{ backgroundColor: '#9bb4c8' }}>
+                          일정
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={styles.subjectPill}
+                          style={{ backgroundColor: schedule.subjectColor ?? '#d7dee7' }}
+                        >
+                          {schedule.subjectName ?? '미지정'}
+                        </span>
+                      </td>
+                      <td className={styles.titleCell}>
+                        <div className={styles.titleStack}>
+                          <span>{schedule.title}</span>
+                        </div>
+                      </td>
+                      <td className={styles.dateCell}>
+                        {formatDueDate(schedule.startsAt)}
+                      </td>
+                      <td>
+                        <span className={`${styles.dDayBadge} ${getDDayClassName(schedule.startsAt)}`}>
+                          {formatDDay(schedule.startsAt)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={styles.helperInline}>-</span>
+                      </td>
+                      <td>
+                        <span className={styles.helperInline}>-</span>
+                      </td>
+                      <td>
+                        <span className={styles.helperInline}>-</span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.editButton}
+                          onClick={() => openEditScheduleModal(schedule)}
+                          disabled={isSaving}
+                          aria-label="일정 수정"
+                        >
+                          <EditIcon className={styles.editIcon} />
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          onClick={() => setDeletingSchedule(schedule)}
+                          disabled={isSaving}
+                          aria-label="일정 삭제"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -778,17 +1528,19 @@ export function AssignmentsPage() {
               <button
                 type="button"
                 className={styles.calendarNavButton}
+                aria-label="이전 달"
                 onClick={() => setCalendarMonth((current) => shiftMonth(current, -1))}
               >
-                이전
+                {'<'}
               </button>
               <h2 className={styles.calendarMonthLabel}>{formatMonthLabel(calendarMonth)}</h2>
               <button
                 type="button"
                 className={styles.calendarNavButton}
+                aria-label="다음 달"
                 onClick={() => setCalendarMonth((current) => shiftMonth(current, 1))}
               >
-                다음
+                {'>'}
               </button>
             </div>
 
@@ -813,6 +1565,8 @@ export function AssignmentsPage() {
               {calendarCells.map((cellDate) => {
                 const dateKey = getDateKey(cellDate)
                 const dayAssignments = assignmentsByDate[dateKey] ?? []
+                const dayExams = examsByDate[dateKey] ?? []
+                const daySchedules = schedulesByDate[dateKey] ?? []
                 const isCurrentMonth = cellDate.getMonth() === calendarMonth.getMonth()
                 const isToday = getDateKey(new Date()) === dateKey
                 const isSunday = cellDate.getDay() === 0
@@ -826,6 +1580,12 @@ export function AssignmentsPage() {
                         ? `${styles.calendarCell} ${isToday ? styles.calendarCellToday : ''}`
                         : `${styles.calendarCell} ${styles.calendarCellMuted}`
                     }
+                    onClick={() => {
+                      const hasItems = dayAssignments.length > 0 || dayExams.length > 0 || daySchedules.length > 0
+                      if (hasItems) {
+                        openCalendarDay(cellDate)
+                      }
+                    }}
                   >
                     <div className={styles.calendarCellHeader}>
                       <span
@@ -843,7 +1603,7 @@ export function AssignmentsPage() {
                     </div>
 
                     <div className={styles.calendarAssignments}>
-                      {dayAssignments.slice(0, 2).map((assignment) => (
+                      {dayAssignments.map((assignment) => (
                         <button
                           key={assignment.id}
                           type="button"
@@ -852,29 +1612,41 @@ export function AssignmentsPage() {
                               ? `${styles.calendarAssignment} ${styles.calendarAssignmentSubmitted}`
                               : styles.calendarAssignment
                           }
-                          onClick={() => openEditModal(assignment)}
+                          onClick={(e) => e.stopPropagation()}
+                          title={assignment.title}
                         >
-                          <span className={styles.calendarAssignmentLine}>
-                            <span
-                              className={styles.calendarAssignmentSubject}
-                              style={{ backgroundColor: assignment.subjectColor ?? '#d7dee7' }}
-                            >
-                              {assignment.subjectName ?? '미지정'}
-                            </span>
-                            <span className={styles.calendarAssignmentTitle}>{assignment.title}</span>
+                          <span className={styles.calendarMarker} style={{ color: assignment.subjectColor ?? '#d7dee7' }}>●</span>
+                        </button>
+                      ))}
+
+                      {dayExams.map((exam) => (
+                        <button
+                          key={exam.id}
+                          type="button"
+                          className={`${styles.calendarAssignment} ${styles.calendarAssignmentExam}`}
+                          title={exam.title}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span
+                            className={`${styles.calendarMarker} ${styles.calendarMarkerExam}`}
+                            style={{ color: exam.subjectColor ?? '#d7dee7' }}
+                          >
+                            ★
                           </span>
                         </button>
                       ))}
 
-                      {dayAssignments.length > 2 ? (
+                      {daySchedules.map((schedule) => (
                         <button
+                          key={schedule.id}
                           type="button"
-                          className={styles.calendarMore}
-                          onClick={() => setSelectedCalendarDate(cellDate)}
+                          className={styles.calendarAssignment}
+                          title={schedule.title}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          +{dayAssignments.length - 2}개 더보기
+                          <span className={styles.calendarMarker} style={{ color: schedule.subjectColor ?? schedule.color ?? '#9bb4c8' }}>◆</span>
                         </button>
-                      ) : null}
+                      ))}
                     </div>
                   </article>
                 )
@@ -897,6 +1669,40 @@ export function AssignmentsPage() {
           remainingBytes={Math.max(0, storageSummary.personalLimitBytes - storageSummary.personalBytes)}
           createAssignment={createAssignmentWithAssets}
           updateAssignment={updateAssignmentWithAssets}
+        />
+      ) : null}
+
+      {isExamModalOpen ? (
+        <ExamModal
+          exam={editingExam}
+          subjects={subjects}
+          onClose={() => {
+            setIsExamModalOpen(false)
+            setEditingExam(null)
+          }}
+          onSaved={async () => {
+            await refreshAll()
+            setIsExamModalOpen(false)
+            setEditingExam(null)
+          }}
+          isSaving={isSaving}
+        />
+      ) : null}
+
+      {isScheduleModalOpen ? (
+        <ScheduleModal
+          schedule={editingSchedule}
+          subjects={subjects}
+          onClose={() => {
+            setIsScheduleModalOpen(false)
+            setEditingSchedule(null)
+          }}
+          onSaved={async () => {
+            await refreshAll()
+            setIsScheduleModalOpen(false)
+            setEditingSchedule(null)
+          }}
+          isSaving={isSaving}
         />
       ) : null}
 
@@ -960,6 +1766,124 @@ export function AssignmentsPage() {
         </div>
       ) : null}
 
+      {deletingExam ? (
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => {
+            if (!isSaving) {
+              setDeletingExam(null)
+            }
+          }}
+        >
+          <section
+            className={styles.deleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-exam-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.deleteModalHeader}>
+              <div>
+                <h2 id="delete-exam-title" className={styles.deleteModalTitle}>
+                  시험을 삭제할까요?
+                </h2>
+                <p className={styles.deleteModalDescription}>
+                  <strong>{deletingExam.title}</strong> 시험을 삭제하면 복구할 수 없습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.deleteModalClose}
+                onClick={() => setDeletingExam(null)}
+                disabled={isSaving}
+                aria-label="삭제 확인 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.deleteModalActions}>
+              <button
+                type="button"
+                className={styles.deleteModalCancel}
+                onClick={() => setDeletingExam(null)}
+                disabled={isSaving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.deleteModalConfirm}
+                onClick={() => void confirmDeleteExam()}
+                disabled={isSaving}
+              >
+                삭제하기
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {deletingSchedule ? (
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => {
+            if (!isSaving) {
+              setDeletingSchedule(null)
+            }
+          }}
+        >
+          <section
+            className={styles.deleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-schedule-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.deleteModalHeader}>
+              <div>
+                <h2 id="delete-schedule-title" className={styles.deleteModalTitle}>
+                  일정을 삭제할까요?
+                </h2>
+                <p className={styles.deleteModalDescription}>
+                  <strong>{deletingSchedule.title}</strong> 일정을 삭제하면 복구할 수 없습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.deleteModalClose}
+                onClick={() => setDeletingSchedule(null)}
+                disabled={isSaving}
+                aria-label="삭제 확인 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.deleteModalActions}>
+              <button
+                type="button"
+                className={styles.deleteModalCancel}
+                onClick={() => setDeletingSchedule(null)}
+                disabled={isSaving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.deleteModalConfirm}
+                onClick={() => void confirmDeleteSchedule()}
+                disabled={isSaving}
+              >
+                삭제하기
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {attachmentsAssignment ? (
         <AttachmentListModal
           assignment={attachmentsAssignment}
@@ -991,12 +1915,25 @@ export function AssignmentsPage() {
         />
       ) : null}
 
+      {isSubjectColorModalOpen ? (
+        <SubjectColorModal
+          subjects={subjects}
+          onClose={() => setIsSubjectColorModalOpen(false)}
+          onUpdate={handleUpdateSubjectColor}
+          isSaving={isSaving}
+        />
+      ) : null}
+
       {selectedCalendarDate ? (
         <CalendarDayModal
           date={selectedCalendarDate}
           assignments={selectedDateAssignments}
+          exams={selectedDateExams}
+          schedules={selectedDateSchedules}
           onClose={() => setSelectedCalendarDate(null)}
           onOpenAssignment={openEditModal}
+          onOpenExam={openEditExamModal}
+          onOpenSchedule={openEditScheduleModal}
         />
       ) : null}
     </>

@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { Assignment, StorageUsageSummary, Subject } from '../../types'
+import type { Assignment, Exam, ScheduleEvent, StorageUsageSummary, Subject } from '../../types'
 
 export const EMPTY_STORAGE_SUMMARY: StorageUsageSummary = {
   personalBytes: 0,
@@ -10,6 +10,8 @@ export const EMPTY_STORAGE_SUMMARY: StorageUsageSummary = {
 
 export interface UserWorkspaceContextValue {
   assignments: Assignment[]
+  exams: Exam[]
+  schedules: ScheduleEvent[]
   subjects: Subject[]
   storageSummary: StorageUsageSummary
   isLoading: boolean

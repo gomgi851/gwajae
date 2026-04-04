@@ -17,7 +17,13 @@ security definer
 set search_path = public
 as $$
 begin
-  if old.role is distinct from new.role and not public.is_super_admin_user() then
+  if old.role is distinct from new.role
+    and not (
+      public.is_super_admin_user()
+      or current_user = 'postgres'
+      or coalesce(auth.role(), '') = 'service_role'
+      or auth.uid() is null
+    ) then
     raise exception 'only super admin can change user roles';
   end if;
 
@@ -382,6 +388,115 @@ $$;
 
 create index if not exists assignments_owner_due_date_idx
 on public.assignments (owner_user_id, due_date, created_at desc);
+
+create table if not exists public.exams (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  subject_id uuid not null references public.subjects(id) on delete restrict,
+  title text not null,
+  exam_at timestamptz not null,
+  description text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists exams_owner_exam_at_idx
+on public.exams (owner_user_id, exam_at, created_at desc);
+
+drop trigger if exists exams_set_updated_at on public.exams;
+create trigger exams_set_updated_at
+before update on public.exams
+for each row
+execute function public.set_updated_at();
+
+alter table public.exams enable row level security;
+
+drop policy if exists "exams_select_owner" on public.exams;
+create policy "exams_select_owner"
+on public.exams
+for select
+to authenticated
+using (owner_user_id = auth.uid());
+
+drop policy if exists "exams_insert_owner" on public.exams;
+create policy "exams_insert_owner"
+on public.exams
+for insert
+to authenticated
+with check (owner_user_id = auth.uid());
+
+drop policy if exists "exams_update_owner" on public.exams;
+create policy "exams_update_owner"
+on public.exams
+for update
+to authenticated
+using (owner_user_id = auth.uid())
+with check (owner_user_id = auth.uid());
+
+drop policy if exists "exams_delete_owner" on public.exams;
+create policy "exams_delete_owner"
+on public.exams
+for delete
+to authenticated
+using (owner_user_id = auth.uid());
+
+create table if not exists public.schedules (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  subject_id uuid references public.subjects(id) on delete set null,
+  title text not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz,
+  is_all_day boolean not null default false,
+  location text,
+  note text,
+  color text not null default '#9bb4c8',
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.schedules
+add column if not exists subject_id uuid references public.subjects(id) on delete set null;
+
+create index if not exists schedules_owner_starts_at_idx
+on public.schedules (owner_user_id, starts_at, created_at desc);
+
+drop trigger if exists schedules_set_updated_at on public.schedules;
+create trigger schedules_set_updated_at
+before update on public.schedules
+for each row
+execute function public.set_updated_at();
+
+alter table public.schedules enable row level security;
+
+drop policy if exists "schedules_select_owner" on public.schedules;
+create policy "schedules_select_owner"
+on public.schedules
+for select
+to authenticated
+using (owner_user_id = auth.uid());
+
+drop policy if exists "schedules_insert_owner" on public.schedules;
+create policy "schedules_insert_owner"
+on public.schedules
+for insert
+to authenticated
+with check (owner_user_id = auth.uid());
+
+drop policy if exists "schedules_update_owner" on public.schedules;
+create policy "schedules_update_owner"
+on public.schedules
+for update
+to authenticated
+using (owner_user_id = auth.uid())
+with check (owner_user_id = auth.uid());
+
+drop policy if exists "schedules_delete_owner" on public.schedules;
+create policy "schedules_delete_owner"
+on public.schedules
+for delete
+to authenticated
+using (owner_user_id = auth.uid());
 
 drop trigger if exists assignments_set_updated_at on public.assignments;
 create trigger assignments_set_updated_at

@@ -1,3 +1,13 @@
+// Workspace TypeScript checks this Deno Edge Function file too.
+// Provide minimal declarations so VS Code diagnostics stay clean.
+declare const Deno: {
+  serve: (handler: (request: Request) => Response | Promise<Response>) => void
+  env: {
+    get: (key: string) => string | undefined
+  }
+}
+
+// @ts-ignore Deno/URL import is resolved at Supabase Edge runtime.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -114,7 +124,8 @@ Deno.serve(async (request) => {
     }
 
     const matchedUser = authUsersData.users.find(
-      (candidate) => candidate.email?.toLowerCase() === targetEmail,
+      (candidate: { email?: string | null; id: string }) =>
+        candidate.email?.toLowerCase() === targetEmail,
     )
 
     targetAuthUserId = matchedUser?.id ?? null
@@ -131,7 +142,7 @@ Deno.serve(async (request) => {
     }
 
     const storagePaths = (assetRows ?? [])
-      .map((row) => String(row.storage_path ?? ''))
+      .map((row: { storage_path?: string | null }) => String(row.storage_path ?? ''))
       .filter(Boolean)
 
     for (let index = 0; index < storagePaths.length; index += 100) {
