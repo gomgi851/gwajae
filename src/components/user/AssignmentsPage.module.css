@@ -284,6 +284,15 @@
   display: inline-flex;
 }
 
+.filesPopoverShell::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 18rem;
+  height: 0.8rem;
+}
+
 .filesTrigger {
   border: none;
   background: transparent;
@@ -296,7 +305,7 @@
 
 .filesPopover {
   position: absolute;
-  top: calc(100% + 0.55rem);
+  top: calc(100% + 0.12rem);
   right: 0;
   z-index: 12;
   width: 18rem;
