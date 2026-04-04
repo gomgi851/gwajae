@@ -185,6 +185,7 @@ export function AssignmentsPage() {
   const [previewAsset, setPreviewAsset] = useState<AssignmentAsset | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewDownloadUrl, setPreviewDownloadUrl] = useState<string | null>(null)
+  const [deletingAssignment, setDeletingAssignment] = useState<Assignment | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
@@ -252,23 +253,22 @@ export function AssignmentsPage() {
     await refreshAll()
   }
 
-  async function handleDeleteAssignment(assignment: Assignment) {
-    const shouldDelete = window.confirm(`'${assignment.title}' 과제를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)
-
-    if (!shouldDelete) {
+  async function confirmDeleteAssignment() {
+    if (!deletingAssignment) {
       return
     }
 
     setIsSaving(true)
     setError(null)
 
-    const { error: deleteError } = await deleteAssignment(assignment.id)
+    const { error: deleteError } = await deleteAssignment(deletingAssignment.id)
     if (deleteError) {
       setError(deleteError.message)
       setIsSaving(false)
       return
     }
 
+    setDeletingAssignment(null)
     setIsSaving(false)
     await refreshAll()
   }
@@ -543,7 +543,7 @@ export function AssignmentsPage() {
                     <button
                       type="button"
                       className={styles.deleteButton}
-                      onClick={() => void handleDeleteAssignment(assignment)}
+                      onClick={() => setDeletingAssignment(assignment)}
                       disabled={isSaving}
                       aria-label="과제 삭제"
                     >
@@ -574,6 +574,66 @@ export function AssignmentsPage() {
           createAssignment={createAssignmentWithAssets}
           updateAssignment={updateAssignmentWithAssets}
         />
+      ) : null}
+
+      {deletingAssignment ? (
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => {
+            if (!isSaving) {
+              setDeletingAssignment(null)
+            }
+          }}
+        >
+          <section
+            className={styles.deleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-assignment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.deleteModalHeader}>
+              <div>
+                <h2 id="delete-assignment-title" className={styles.deleteModalTitle}>
+                  과제를 삭제할까요?
+                </h2>
+                <p className={styles.deleteModalDescription}>
+                  <strong>{deletingAssignment.title}</strong> 과제를 삭제하면 첨부 파일까지 함께
+                  사라지며 복구할 수 없습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.deleteModalClose}
+                onClick={() => setDeletingAssignment(null)}
+                disabled={isSaving}
+                aria-label="삭제 확인 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.deleteModalActions}>
+              <button
+                type="button"
+                className={styles.deleteModalCancel}
+                onClick={() => setDeletingAssignment(null)}
+                disabled={isSaving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.deleteModalConfirm}
+                onClick={() => void confirmDeleteAssignment()}
+                disabled={isSaving}
+              >
+                삭제하기
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {previewAsset && previewUrl ? (
