@@ -395,10 +395,14 @@ create table if not exists public.exams (
   subject_id uuid not null references public.subjects(id) on delete restrict,
   title text not null,
   exam_at timestamptz not null,
+  is_favorite boolean not null default false,
   description text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.exams
+add column if not exists is_favorite boolean not null default false;
 
 create index if not exists exams_owner_exam_at_idx
 on public.exams (owner_user_id, exam_at, created_at desc);
@@ -448,6 +452,7 @@ create table if not exists public.schedules (
   starts_at timestamptz not null,
   ends_at timestamptz,
   is_all_day boolean not null default false,
+  is_favorite boolean not null default false,
   location text,
   note text,
   color text not null default '#9bb4c8',
@@ -457,6 +462,9 @@ create table if not exists public.schedules (
 
 alter table public.schedules
 add column if not exists subject_id uuid references public.subjects(id) on delete set null;
+
+alter table public.schedules
+add column if not exists is_favorite boolean not null default false;
 
 create index if not exists schedules_owner_starts_at_idx
 on public.schedules (owner_user_id, starts_at, created_at desc);

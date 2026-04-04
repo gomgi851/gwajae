@@ -24,3 +24,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase local temp artifacts
+supabase/.temp/
+
+# Local debug screenshots and temp excerpts
+tmp-*.png
+tmp_assignments_excerpt.txt

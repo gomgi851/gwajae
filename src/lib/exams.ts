@@ -12,6 +12,7 @@ interface ExamRow {
   subject_id: string
   title: string
   exam_at: string
+  is_favorite?: boolean
   description: string | null
   subject?: SubjectRow | SubjectRow[] | null
 }
@@ -46,6 +47,7 @@ function mapExam(row: ExamRow): Exam {
     subjectId: row.subject_id,
     title: row.title,
     examAt: row.exam_at,
+    isFavorite: Boolean(row.is_favorite),
     description: row.description ?? '',
     subjectName: subject?.name ?? '미지정',
     subjectColor: subject?.color ?? '#d7dee7',
@@ -73,6 +75,7 @@ export async function fetchExams() {
       subject_id,
       title,
       exam_at,
+      is_favorite,
       description,
       subject:subjects(id,name,color)
     `)
@@ -119,6 +122,7 @@ export async function createExam(input: ExamFormInput) {
       subject_id,
       title,
       exam_at,
+      is_favorite,
       description,
       subject:subjects(id,name,color)
     `)
@@ -165,6 +169,7 @@ export async function updateExam(examId: string, input: ExamFormInput) {
       subject_id,
       title,
       exam_at,
+      is_favorite,
       description,
       subject:subjects(id,name,color)
     `)
@@ -198,4 +203,44 @@ export async function deleteExam(examId: string) {
   }
 
   return { error }
+}
+
+export async function toggleExamFlags(examId: string, updates: { isFavorite?: boolean }) {
+  if (!supabase) {
+    return { data: null as Exam | null, error: null }
+  }
+
+  const userId = await getCurrentUserId()
+  if (!userId) {
+    return {
+      data: null as Exam | null,
+      error: new Error('시험을 수정하려면 먼저 로그인해 주세요.'),
+    }
+  }
+
+  const nextPayload: Record<string, unknown> = {}
+  if (updates.isFavorite !== undefined) {
+    nextPayload.is_favorite = updates.isFavorite
+  }
+
+  const { data, error } = await supabase
+    .from('exams')
+    .update(nextPayload)
+    .eq('id', examId)
+    .select(`
+      id,
+      subject_id,
+      title,
+      exam_at,
+      is_favorite,
+      description,
+      subject:subjects(id,name,color)
+    `)
+    .single()
+
+  if (error) {
+    return { data: null as Exam | null, error }
+  }
+
+  return { data: mapExam(data as unknown as ExamRow), error: null }
 }

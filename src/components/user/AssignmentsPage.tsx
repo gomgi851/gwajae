@@ -8,8 +8,8 @@ import {
   toggleAssignmentFlags,
   updateAssignmentWithAssets,
 } from '../../lib/assignments'
-import { deleteExam } from '../../lib/exams'
-import { deleteSchedule } from '../../lib/schedules'
+import { deleteExam, toggleExamFlags } from '../../lib/exams'
+import { deleteSchedule, toggleScheduleFlags } from '../../lib/schedules'
 import { createSubject, updateSubjectColor } from '../../lib/subjects'
 import type { Assignment, AssignmentAsset, Exam, ScheduleEvent, Subject } from '../../types'
 import {
@@ -55,43 +55,12 @@ const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토']
 type ViewMode = 'table' | 'calendar'
 type ItemTypeFilter = 'all' | 'assignment' | 'exam' | 'schedule'
 type DDayState = 'today' | 'urgent' | 'past' | 'normal'
+type DDayFilter = 'all' | 'today' | 'urgent' | 'past'
+type DDaySortMode = 'time' | 'dday'
 type TimelineRow =
   | { kind: 'assignment'; sortDate: string; isFavorite: boolean; assignment: Assignment }
   | { kind: 'exam'; sortDate: string; isFavorite: boolean; exam: Exam }
   | { kind: 'schedule'; sortDate: string; isFavorite: boolean; schedule: ScheduleEvent }
-
-const EXAM_PIN_STORAGE_KEY = 'gwajae:pinned-exams'
-const SCHEDULE_PIN_STORAGE_KEY = 'gwajae:pinned-schedules'
-
-function readPinnedIds(storageKey: string) {
-  if (typeof window === 'undefined') {
-    return [] as string[]
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(storageKey)
-    if (!rawValue) {
-      return [] as string[]
-    }
-
-    const parsed = JSON.parse(rawValue)
-    if (!Array.isArray(parsed)) {
-      return [] as string[]
-    }
-
-    return parsed.filter((id): id is string => typeof id === 'string')
-  } catch {
-    return [] as string[]
-  }
-}
-
-function writePinnedIds(storageKey: string, ids: string[]) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.localStorage.setItem(storageKey, JSON.stringify(ids))
-}
 
 function formatDueDate(isoDate: string) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -110,12 +79,16 @@ function formatMonthLabel(date: Date) {
   }).format(date)
 }
 
-function formatDDay(isoDate: string) {
+function getDDayDiff(isoDate: string) {
   const target = new Date(isoDate)
   const now = new Date()
   const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate())
   const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const diffDays = Math.round((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.round((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function formatDDay(isoDate: string) {
+  const diffDays = getDDayDiff(isoDate)
 
   if (diffDays === 0) {
     return 'D-Day'
@@ -125,11 +98,7 @@ function formatDDay(isoDate: string) {
 }
 
 function getDDayState(isoDate: string): DDayState {
-  const target = new Date(isoDate)
-  const now = new Date()
-  const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const diffDays = Math.round((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+  const diffDays = getDDayDiff(isoDate)
 
   if (diffDays === 0) {
     return 'today'
@@ -162,6 +131,19 @@ function getDDayClassName(isoDate: string) {
   }
 
   return styles.dDayNormal
+}
+
+function matchesDDayFilter(isoDate: string, filter: DDayFilter) {
+  const state = getDDayState(isoDate)
+  if (filter === 'all') {
+    return true
+  }
+
+  if (filter === 'urgent') {
+    return state === 'urgent' || state === 'today'
+  }
+
+  return state === filter
 }
 
 function sortAssignments(assignments: Assignment[]) {
@@ -724,9 +706,9 @@ export function AssignmentsPage() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [dDayFilter, setDDayFilter] = useState<DDayFilter>('all')
+  const [dDaySortMode, setDDaySortMode] = useState<DDaySortMode>('time')
   const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(assignments))
-  const [pinnedExamIds, setPinnedExamIds] = useState<string[]>(() => readPinnedIds(EXAM_PIN_STORAGE_KEY))
-  const [pinnedScheduleIds, setPinnedScheduleIds] = useState<string[]>(() => readPinnedIds(SCHEDULE_PIN_STORAGE_KEY))
 
   const sortedAssignments = useMemo(() => sortAssignments(assignments), [assignments])
   const filteredAssignments = useMemo(() => {
@@ -735,11 +717,13 @@ export function AssignmentsPage() {
     }
 
     if (subjectFilter === 'all') {
-      return sortedAssignments
+      return sortedAssignments.filter((assignment) => matchesDDayFilter(assignment.dueDate, dDayFilter))
     }
 
-    return sortedAssignments.filter((assignment) => assignment.subjectId === subjectFilter)
-  }, [sortedAssignments, subjectFilter, itemTypeFilter])
+    return sortedAssignments.filter(
+      (assignment) => assignment.subjectId === subjectFilter && matchesDDayFilter(assignment.dueDate, dDayFilter),
+    )
+  }, [sortedAssignments, subjectFilter, itemTypeFilter, dDayFilter])
 
   const filteredExams = useMemo(() => {
     if (itemTypeFilter !== 'all' && itemTypeFilter !== 'exam') {
@@ -747,11 +731,13 @@ export function AssignmentsPage() {
     }
 
     if (subjectFilter === 'all') {
-      return exams
+      return exams.filter((exam) => matchesDDayFilter(exam.examAt, dDayFilter))
     }
 
-    return exams.filter((exam) => exam.subjectId === subjectFilter)
-  }, [exams, subjectFilter, itemTypeFilter])
+    return exams.filter(
+      (exam) => exam.subjectId === subjectFilter && matchesDDayFilter(exam.examAt, dDayFilter),
+    )
+  }, [exams, subjectFilter, itemTypeFilter, dDayFilter])
 
   const sortedExams = useMemo(() => {
     return [...filteredExams].sort((left, right) => {
@@ -765,11 +751,13 @@ export function AssignmentsPage() {
     }
 
     if (subjectFilter === 'all') {
-      return schedules
+      return schedules.filter((schedule) => matchesDDayFilter(schedule.startsAt, dDayFilter))
     }
 
-    return schedules.filter((schedule) => schedule.subjectId === subjectFilter)
-  }, [schedules, subjectFilter, itemTypeFilter])
+    return schedules.filter(
+      (schedule) => schedule.subjectId === subjectFilter && matchesDDayFilter(schedule.startsAt, dDayFilter),
+    )
+  }, [schedules, subjectFilter, itemTypeFilter, dDayFilter])
 
   const sortedSchedules = useMemo(() => {
     return [...filteredSchedules].sort((left, right) => {
@@ -787,13 +775,13 @@ export function AssignmentsPage() {
     const examRows: TimelineRow[] = sortedExams.map((exam) => ({
       kind: 'exam',
       sortDate: exam.examAt,
-      isFavorite: pinnedExamIds.includes(exam.id),
+      isFavorite: exam.isFavorite,
       exam,
     }))
     const scheduleRows: TimelineRow[] = sortedSchedules.map((schedule) => ({
       kind: 'schedule',
       sortDate: schedule.startsAt,
-      isFavorite: pinnedScheduleIds.includes(schedule.id),
+      isFavorite: schedule.isFavorite,
       schedule,
     }))
 
@@ -802,9 +790,28 @@ export function AssignmentsPage() {
         return Number(right.isFavorite) - Number(left.isFavorite)
       }
 
+      if (dDaySortMode === 'dday') {
+        const leftDiff = getDDayDiff(left.sortDate)
+        const rightDiff = getDDayDiff(right.sortDate)
+        const leftRank = leftDiff < 0 ? 3 : leftDiff === 0 ? 0 : leftDiff <= 3 ? 1 : 2
+        const rightRank = rightDiff < 0 ? 3 : rightDiff === 0 ? 0 : rightDiff <= 3 ? 1 : 2
+
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank
+        }
+
+        if (leftDiff < 0 && rightDiff < 0) {
+          return rightDiff - leftDiff
+        }
+
+        if (leftDiff >= 0 && rightDiff >= 0) {
+          return leftDiff - rightDiff
+        }
+      }
+
       return new Date(left.sortDate).getTime() - new Date(right.sortDate).getTime()
     })
-  }, [filteredAssignments, sortedExams, sortedSchedules, pinnedExamIds, pinnedScheduleIds])
+  }, [filteredAssignments, sortedExams, sortedSchedules, dDaySortMode])
 
   const assignmentsByDate = useMemo(
     () => buildAssignmentsByDate(filteredAssignments),
@@ -913,24 +920,40 @@ export function AssignmentsPage() {
     await refreshAll()
   }
 
-  function handleToggleExamFavorite(exam: Exam) {
-    setPinnedExamIds((current) => {
-      const next = current.includes(exam.id)
-        ? current.filter((id) => id !== exam.id)
-        : [...current, exam.id]
-      writePinnedIds(EXAM_PIN_STORAGE_KEY, next)
-      return next
+  async function handleToggleExamFavorite(exam: Exam) {
+    setIsSaving(true)
+    setError(null)
+
+    const { error: updateError } = await toggleExamFlags(exam.id, {
+      isFavorite: !exam.isFavorite,
     })
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setIsSaving(false)
+    await refreshAll()
   }
 
-  function handleToggleScheduleFavorite(schedule: ScheduleEvent) {
-    setPinnedScheduleIds((current) => {
-      const next = current.includes(schedule.id)
-        ? current.filter((id) => id !== schedule.id)
-        : [...current, schedule.id]
-      writePinnedIds(SCHEDULE_PIN_STORAGE_KEY, next)
-      return next
+  async function handleToggleScheduleFavorite(schedule: ScheduleEvent) {
+    setIsSaving(true)
+    setError(null)
+
+    const { error: updateError } = await toggleScheduleFlags(schedule.id, {
+      isFavorite: !schedule.isFavorite,
     })
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsSaving(false)
+      return
+    }
+
+    setIsSaving(false)
+    await refreshAll()
   }
 
   async function confirmDeleteAssignment() {
@@ -1153,7 +1176,78 @@ export function AssignmentsPage() {
             </button>
           </div>
 
+          <div className={styles.filterButtons}>
+            <button
+              type="button"
+              className={
+                dDayFilter === 'all'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setDDayFilter('all')}
+            >
+              D-day 전체
+            </button>
+            <button
+              type="button"
+              className={
+                dDayFilter === 'today'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setDDayFilter('today')}
+            >
+              오늘
+            </button>
+            <button
+              type="button"
+              className={
+                dDayFilter === 'urgent'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setDDayFilter('urgent')}
+            >
+              D-3 이내
+            </button>
+            <button
+              type="button"
+              className={
+                dDayFilter === 'past'
+                  ? `${styles.filterButton} ${styles.filterButtonActive}`
+                  : styles.filterButton
+              }
+              onClick={() => setDDayFilter('past')}
+            >
+              지난 일정
+            </button>
+          </div>
+
           <div className={styles.actions}>
+            <div className={styles.viewToggle}>
+              <button
+                type="button"
+                className={
+                  dDaySortMode === 'time'
+                    ? `${styles.viewButton} ${styles.viewButtonActive}`
+                    : styles.viewButton
+                }
+                onClick={() => setDDaySortMode('time')}
+              >
+                시간순
+              </button>
+              <button
+                type="button"
+                className={
+                  dDaySortMode === 'dday'
+                    ? `${styles.viewButton} ${styles.viewButtonActive}`
+                    : styles.viewButton
+                }
+                onClick={() => setDDaySortMode('dday')}
+              >
+                임박순
+              </button>
+            </div>
             <label className={styles.selectShell}>
               <span className={styles.visuallyHidden}>과목별 필터</span>
               <select value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}>
@@ -1370,7 +1464,7 @@ export function AssignmentsPage() {
 
                   if (row.kind === 'exam') {
                     const { exam } = row
-                    const isExamPinned = row.isFavorite
+                    const isExamPinned = exam.isFavorite
 
                     return (
                       <tr key={`exam-${exam.id}`}>
@@ -1378,7 +1472,7 @@ export function AssignmentsPage() {
                           <button
                             type="button"
                             className={isExamPinned ? styles.favoriteActive : styles.favoriteMuted}
-                            onClick={() => handleToggleExamFavorite(exam)}
+                            onClick={() => void handleToggleExamFavorite(exam)}
                             disabled={isSaving}
                             aria-label={isExamPinned ? '고정 해제' : '맨 위로 고정'}
                           >
@@ -1444,7 +1538,7 @@ export function AssignmentsPage() {
                   }
 
                   const { schedule } = row
-                  const isSchedulePinned = row.isFavorite
+                  const isSchedulePinned = schedule.isFavorite
 
                   return (
                     <tr key={`schedule-${schedule.id}`}>
@@ -1452,7 +1546,7 @@ export function AssignmentsPage() {
                         <button
                           type="button"
                           className={isSchedulePinned ? styles.favoriteActive : styles.favoriteMuted}
-                          onClick={() => handleToggleScheduleFavorite(schedule)}
+                          onClick={() => void handleToggleScheduleFavorite(schedule)}
                           disabled={isSaving}
                           aria-label={isSchedulePinned ? '고정 해제' : '맨 위로 고정'}
                         >

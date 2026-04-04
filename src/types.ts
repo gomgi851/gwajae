@@ -40,6 +40,7 @@ export interface Exam {
   subjectId: string
   title: string
   examAt: string
+  isFavorite: boolean
   description?: string
   subjectName?: string
   subjectColor?: string
@@ -51,6 +52,7 @@ export interface ScheduleEvent {
   startsAt: string
   endsAt?: string | null
   isAllDay: boolean
+  isFavorite: boolean
   location?: string | null
   note?: string
   color: string

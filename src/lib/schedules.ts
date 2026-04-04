@@ -7,6 +7,7 @@ interface ScheduleRow {
   starts_at: string
   ends_at: string | null
   is_all_day: boolean
+  is_favorite?: boolean
   location: string | null
   note: string | null
   color: string
@@ -47,6 +48,7 @@ function mapSchedule(row: ScheduleRow): ScheduleEvent {
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     isAllDay: Boolean(row.is_all_day),
+    isFavorite: Boolean(row.is_favorite),
     location: row.location,
     note: row.note ?? '',
     color: row.color,
@@ -72,7 +74,7 @@ export async function fetchSchedules() {
 
   const { data, error } = await supabase
     .from('schedules')
-    .select('id,title,starts_at,ends_at,is_all_day,location,note,color,subject_id,subject:subject_id(name,color)')
+    .select('id,title,starts_at,ends_at,is_all_day,is_favorite,location,note,color,subject_id,subject:subject_id(name,color)')
     .order('starts_at', { ascending: true })
 
   if (error) {
@@ -115,7 +117,7 @@ export async function createSchedule(input: ScheduleFormInput) {
       note: input.note?.trim() || null,
       color: input.color || '#9bb4c8',
     })
-    .select('id,title,starts_at,ends_at,is_all_day,location,note,color,subject_id,subject:subject_id(name,color)')
+    .select('id,title,starts_at,ends_at,is_all_day,is_favorite,location,note,color,subject_id,subject:subject_id(name,color)')
     .single()
 
   if (error) {
@@ -158,7 +160,7 @@ export async function updateSchedule(scheduleId: string, input: ScheduleFormInpu
       color: input.color || '#9bb4c8',
     })
     .eq('id', scheduleId)
-    .select('id,title,starts_at,ends_at,is_all_day,location,note,color,subject_id,subject:subject_id(name,color)')
+    .select('id,title,starts_at,ends_at,is_all_day,is_favorite,location,note,color,subject_id,subject:subject_id(name,color)')
     .single()
 
   if (error) {
@@ -189,4 +191,36 @@ export async function deleteSchedule(scheduleId: string) {
   }
 
   return { error }
+}
+
+export async function toggleScheduleFlags(scheduleId: string, updates: { isFavorite?: boolean }) {
+  if (!supabase) {
+    return { data: null as ScheduleEvent | null, error: null }
+  }
+
+  const userId = await getCurrentUserId()
+  if (!userId) {
+    return {
+      data: null as ScheduleEvent | null,
+      error: new Error('일정을 수정하려면 먼저 로그인해 주세요.'),
+    }
+  }
+
+  const nextPayload: Record<string, unknown> = {}
+  if (updates.isFavorite !== undefined) {
+    nextPayload.is_favorite = updates.isFavorite
+  }
+
+  const { data, error } = await supabase
+    .from('schedules')
+    .update(nextPayload)
+    .eq('id', scheduleId)
+    .select('id,title,starts_at,ends_at,is_all_day,is_favorite,location,note,color,subject_id,subject:subject_id(name,color)')
+    .single()
+
+  if (error) {
+    return { data: null as ScheduleEvent | null, error }
+  }
+
+  return { data: mapSchedule(data as unknown as ScheduleRow), error: null }
 }
