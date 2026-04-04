@@ -344,6 +344,21 @@
   cursor: pointer;
 }
 
+.previewChip {
+  flex-shrink: 0;
+  width: 2.15rem;
+  height: 2.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(18, 23, 39, 0.14);
+  border-radius: 0.65rem;
+  background: #eef4f8;
+  color: #58718a;
+  cursor: pointer;
+}
+
+.previewChip:disabled,
 .downloadChip:disabled {
   opacity: 0.55;
   cursor: not-allowed;

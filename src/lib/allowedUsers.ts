@@ -139,7 +139,7 @@ async function normalizeFunctionInvokeError(error: unknown) {
       return { message: payload.message }
     }
   } catch {
-    // Fall back to the SDK error message when the response body isn't JSON.
+    // response body is not JSON; keep the SDK message
   }
 
   return { message: defaultMessage }

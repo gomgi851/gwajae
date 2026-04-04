@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
-import { DownloadIcon } from '../common/ActionIcons'
+import { DownloadIcon, PreviewIcon } from '../common/ActionIcons'
 import type { Assignment, AssignmentAsset, Subject } from '../../types'
-import { getAssignmentAssetDownloadUrl, type AssignmentFormInput } from '../../lib/assignments'
+import {
+  getAssignmentAssetDownloadUrl,
+  getAssignmentAssetPreviewKind,
+  getAssignmentAssetPreviewUrl,
+  type AssignmentFormInput,
+} from '../../lib/assignments'
+import { AssetPreviewModal } from './AssetPreviewModal'
 import styles from './NewAssignmentModal.module.css'
 
 type ActiveTab = 'info' | 'attachments'
@@ -100,7 +106,7 @@ function getAssetSummaryLabel(asset: AssignmentAsset) {
 
 function getNewFileSummaryLabel(file: File, kind: 'image' | 'file', isFirstImage: boolean) {
   const prefix = kind === 'image' ? '이미지' : '파일'
-  const suffix = kind === 'image' && isFirstImage ? ' · 첫 이미지가 썸네일로 저장됩니다.' : ''
+  const suffix = kind === 'image' && isFirstImage ? ' · 첫 이미지가 썸네일로 설정됩니다.' : ''
   return `${prefix} · ${bytesToMegabytes(file.size)}MB${suffix}`
 }
 
@@ -133,6 +139,10 @@ export function NewAssignmentModal({
   const [removedAssetIds, setRemovedAssetIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null)
+  const [previewingAssetId, setPreviewingAssetId] = useState<string | null>(null)
+  const [previewAsset, setPreviewAsset] = useState<AssignmentAsset | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewDownloadUrl, setPreviewDownloadUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const resolvedSubjectId = subjectId || subjects[0]?.id || ''
@@ -185,8 +195,40 @@ export function NewAssignmentModal({
       return
     }
 
-    window.open(data, '_blank', 'noopener,noreferrer')
+    const link = document.createElement('a')
+    link.href = data
+    link.download = asset.fileName
+    link.rel = 'noreferrer'
+    document.body.append(link)
+    link.click()
+    link.remove()
     setDownloadingAssetId(null)
+  }
+
+  async function handlePreviewAsset(asset: AssignmentAsset) {
+    const previewKind = getAssignmentAssetPreviewKind(asset)
+
+    if (!previewKind) {
+      return
+    }
+
+    setPreviewingAssetId(asset.id)
+
+    const [{ data: nextPreviewUrl, error: previewError }, { data: nextDownloadUrl }] = await Promise.all([
+      getAssignmentAssetPreviewUrl(asset),
+      getAssignmentAssetDownloadUrl(asset),
+    ])
+
+    if (previewError || !nextPreviewUrl) {
+      setError(previewError?.message ?? '첨부 파일 미리보기를 불러오지 못했습니다.')
+      setPreviewingAssetId(null)
+      return
+    }
+
+    setPreviewAsset(asset)
+    setPreviewUrl(nextPreviewUrl)
+    setPreviewDownloadUrl(nextDownloadUrl ?? null)
+    setPreviewingAssetId(null)
   }
 
   async function handleSubmit() {
@@ -290,7 +332,7 @@ export function NewAssignmentModal({
           >
             <label className={styles.field}>
               <span className={styles.fieldLabel}>
-                과제명 <em>*</em>
+                과제명<em>*</em>
               </span>
               <input
                 type="text"
@@ -305,10 +347,7 @@ export function NewAssignmentModal({
                 <span className={styles.fieldLabel}>
                   과목 <em>*</em>
                 </span>
-                <select
-                  value={resolvedSubjectId}
-                  onChange={(event) => setSubjectId(event.target.value)}
-                >
+                <select value={resolvedSubjectId} onChange={(event) => setSubjectId(event.target.value)}>
                   {subjects.map((subject) => (
                     <option key={subject.id} value={subject.id}>
                       {subject.name}
@@ -319,13 +358,9 @@ export function NewAssignmentModal({
 
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>
-                  마감일 <em>*</em>
+                  마감일<em>*</em>
                 </span>
-                <input
-                  type="date"
-                  value={dateValue}
-                  onChange={(event) => setDateValue(event.target.value)}
-                />
+                <input type="date" value={dateValue} onChange={(event) => setDateValue(event.target.value)} />
               </label>
             </div>
 
@@ -416,7 +451,7 @@ export function NewAssignmentModal({
             </div>
 
             {visibleExistingImages.length === 0 && visibleExistingFiles.length === 0 ? (
-              <p className={styles.emptyText}>아직 첨부된 파일이 없습니다.</p>
+              <p className={styles.emptyText}>아직 첨부한 파일이 없습니다.</p>
             ) : (
               <ul className={styles.assetList}>
                 {visibleExistingImages.map((asset) => (
@@ -427,6 +462,17 @@ export function NewAssignmentModal({
                       <span className={styles.assetMeta}>{getAssetSummaryLabel(asset)}</span>
                     </div>
                     <div className={styles.assetActions}>
+                      {getAssignmentAssetPreviewKind(asset) ? (
+                        <button
+                          type="button"
+                          className={styles.previewChip}
+                          onClick={() => void handlePreviewAsset(asset)}
+                          disabled={previewingAssetId === asset.id}
+                          aria-label={`${asset.fileName} 미리보기`}
+                        >
+                          <PreviewIcon className={styles.downloadIcon} />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className={styles.downloadChip}
@@ -454,6 +500,17 @@ export function NewAssignmentModal({
                       <span className={styles.assetMeta}>{getAssetSummaryLabel(asset)}</span>
                     </div>
                     <div className={styles.assetActions}>
+                      {getAssignmentAssetPreviewKind(asset) ? (
+                        <button
+                          type="button"
+                          className={styles.previewChip}
+                          onClick={() => void handlePreviewAsset(asset)}
+                          disabled={previewingAssetId === asset.id}
+                          aria-label={`${asset.fileName} 미리보기`}
+                        >
+                          <PreviewIcon className={styles.downloadIcon} />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className={styles.downloadChip}
@@ -488,9 +545,7 @@ export function NewAssignmentModal({
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={(event) =>
-                      addFiles(Array.from(event.target.files ?? []), setImageFiles)
-                    }
+                    onChange={(event) => addFiles(Array.from(event.target.files ?? []), setImageFiles)}
                   />
                 </label>
                 <label className={styles.attachButton}>
@@ -557,7 +612,9 @@ export function NewAssignmentModal({
               onClick={() => setSubmitted((current) => !current)}
               aria-pressed={submitted}
             >
-              <span className={submitted ? `${styles.toggleKnob} ${styles.toggleKnobActive}` : styles.toggleKnob} />
+              <span
+                className={submitted ? `${styles.toggleKnob} ${styles.toggleKnobActive}` : styles.toggleKnob}
+              />
             </button>
             <span className={styles.toggleLabel}>{submitted ? '제출 완료' : '미제출'}</span>
           </label>
@@ -578,6 +635,19 @@ export function NewAssignmentModal({
           </div>
         </footer>
       </section>
+
+      {previewAsset && previewUrl ? (
+        <AssetPreviewModal
+          asset={previewAsset}
+          previewUrl={previewUrl}
+          downloadUrl={previewDownloadUrl}
+          onClose={() => {
+            setPreviewAsset(null)
+            setPreviewUrl(null)
+            setPreviewDownloadUrl(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

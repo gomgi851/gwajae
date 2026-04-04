@@ -1,0 +1,132 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(68, 75, 90, 0.36);
+  backdrop-filter: blur(10px);
+}
+
+.modal {
+  width: min(100%, 70rem);
+  max-height: 92vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(18, 23, 39, 0.08);
+  box-shadow: 0 24px 60px rgba(26, 30, 45, 0.18);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid rgba(18, 23, 39, 0.08);
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: #31485f;
+  font-size: 1rem;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.meta {
+  margin: 0.28rem 0 0;
+  color: #7b8fa3;
+  font-size: 0.82rem;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.downloadButton,
+.closeButton {
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.downloadButton {
+  padding: 0.72rem 1rem;
+  background: #58718a;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.closeButton {
+  width: 2.6rem;
+  height: 2.6rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(214, 223, 230, 0.95);
+  color: #5e748b;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.body {
+  min-height: 16rem;
+  overflow: auto;
+  padding: 1rem;
+  background: #f4f7fa;
+}
+
+.frame,
+.image {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(218, 227, 233, 0.92);
+}
+
+.frame {
+  min-height: min(72vh, 52rem);
+}
+
+.imageWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20rem;
+}
+
+.image {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  .modal {
+    width: 100%;
+    max-height: 94vh;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

@@ -44,21 +44,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const defaultRole = adminEmails.includes(email) ? 'admin' : 'member'
       const { error: syncError } = await syncAllowedUserAuth(email, nextSession!.user.id, defaultRole)
 
-      if (syncError && !adminEmails.includes(email)) {
-        setAllowedUser(null)
-        setAccessMessage(syncError.message)
-        setIsLoading(false)
+      if (!isMounted) {
         return
       }
 
-      if (adminEmails.includes(email)) {
-        setAllowedUser({
-          id: 'bootstrap-admin',
-          email,
-          role: 'admin',
-          active: true,
-        })
-        setAccessMessage(null)
+      if (syncError) {
+        setAllowedUser(null)
+        setAccessMessage(syncError.message)
         setIsLoading(false)
         return
       }
@@ -89,7 +81,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (!data.active) {
         setAllowedUser(data)
-        setAccessMessage('이 계정은 관리자에 의해 비활성화되었습니다.')
+        setAccessMessage('이 계정은 관리자가 비활성화했습니다.')
         setIsLoading(false)
         return
       }
@@ -119,10 +111,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [adminEmails])
 
   const value = useMemo<AuthContextValue>(() => {
-    const email = session?.user.email?.toLowerCase() ?? ''
-    const isBootstrapAdmin = adminEmails.includes(email)
-    const isAuthorized = Boolean(session?.user) && (isBootstrapAdmin || Boolean(allowedUser?.active))
-    const role = isBootstrapAdmin ? 'admin' : allowedUser?.role ?? null
+    const role = allowedUser?.role ?? null
 
     return {
       isConfigured: isSupabaseConfigured,
@@ -130,7 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       session,
       user: session?.user ?? null,
       isAuthenticated: Boolean(session?.user),
-      isAuthorized,
+      isAuthorized: Boolean(session?.user) && Boolean(allowedUser?.active),
       isAdmin: role === 'admin',
       allowedUserRole: role,
       accessMessage,
@@ -154,7 +143,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await supabase.auth.signOut()
       },
     }
-  }, [accessMessage, adminEmails, allowedUser?.active, allowedUser?.role, isLoading, session])
+  }, [accessMessage, allowedUser?.active, allowedUser?.role, isLoading, session])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

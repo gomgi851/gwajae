@@ -1,7 +1,9 @@
-import type { AssetType, Assignment, AssignmentAsset } from '../types'
+﻿import type { AssetType, Assignment, AssignmentAsset } from '../types'
 import { supabase } from './supabase'
 
 const ASSIGNMENT_BUCKET = 'assignment-assets'
+
+export type AssetPreviewKind = 'image' | 'pdf'
 
 export interface AssignmentFormInput {
   subjectId: string
@@ -47,6 +49,19 @@ interface AssignmentRow {
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
+}
+
+function getAssetExtension(fileName: string) {
+  const parts = fileName.toLowerCase().split('.')
+  return parts.length > 1 ? parts.pop() ?? '' : ''
+}
+
+export function getAssignmentAssetPreviewKind(asset: AssignmentAsset): AssetPreviewKind | null {
+  if (asset.assetType === 'image') {
+    return 'image'
+  }
+
+  return getAssetExtension(asset.fileName) === 'pdf' ? 'pdf' : null
 }
 
 function mapAsset(row: AssetRow): AssignmentAsset {
@@ -146,9 +161,7 @@ async function removeAssetsByIds(assetIds: string[]) {
   const storagePaths = (assets ?? []).map((asset) => String(asset.storage_path ?? '')).filter(Boolean)
 
   if (storagePaths.length > 0) {
-    const { error: storageError } = await supabase.storage
-      .from(ASSIGNMENT_BUCKET)
-      .remove(storagePaths)
+    const { error: storageError } = await supabase.storage.from(ASSIGNMENT_BUCKET).remove(storagePaths)
 
     if (storageError) {
       return { error: storageError }
@@ -191,12 +204,10 @@ async function uploadAssets(
   for (const entry of filesToUpload) {
     const storagePath = `${ownerUserId}/${assignmentId}/${crypto.randomUUID()}-${sanitizeFileName(entry.file.name)}`
 
-    const { error: uploadError } = await supabase.storage
-      .from(ASSIGNMENT_BUCKET)
-      .upload(storagePath, entry.file, {
-        upsert: false,
-        contentType: entry.file.type || undefined,
-      })
+    const { error: uploadError } = await supabase.storage.from(ASSIGNMENT_BUCKET).upload(storagePath, entry.file, {
+      upsert: false,
+      contentType: entry.file.type || undefined,
+    })
 
     if (uploadError) {
       return { error: uploadError }
@@ -225,6 +236,19 @@ export async function getAssignmentAssetDownloadUrl(asset: AssignmentAsset) {
   const { data, error } = await supabase.storage
     .from(ASSIGNMENT_BUCKET)
     .createSignedUrl(asset.storagePath, 60, { download: asset.fileName })
+
+  return {
+    data: data?.signedUrl ?? null,
+    error,
+  }
+}
+
+export async function getAssignmentAssetPreviewUrl(asset: AssignmentAsset) {
+  if (!supabase) {
+    return { data: null as string | null, error: null }
+  }
+
+  const { data, error } = await supabase.storage.from(ASSIGNMENT_BUCKET).createSignedUrl(asset.storagePath, 60)
 
   return {
     data: data?.signedUrl ?? null,
@@ -281,7 +305,7 @@ export async function createAssignmentWithAssets(input: AssignmentFormInput) {
   if (!user) {
     return {
       data: null as Assignment | null,
-      error: new Error('과제를 등록하려면 먼저 로그인해 주세요.'),
+      error: new Error('怨쇱젣瑜??깅줉?섎젮硫?癒쇱? 濡쒓렇?명빐 二쇱꽭??'),
     }
   }
 
@@ -305,12 +329,7 @@ export async function createAssignmentWithAssets(input: AssignmentFormInput) {
   }
 
   const assignmentId = String(insertedAssignment.id)
-  const { error: uploadError } = await uploadAssets(
-    user.id,
-    assignmentId,
-    input.imageFiles,
-    input.attachmentFiles,
-  )
+  const { error: uploadError } = await uploadAssets(user.id, assignmentId, input.imageFiles, input.attachmentFiles)
 
   if (uploadError) {
     return { data: null as Assignment | null, error: uploadError }
@@ -328,7 +347,7 @@ export async function updateAssignmentWithAssets(assignmentId: string, input: As
   if (!user) {
     return {
       data: null as Assignment | null,
-      error: new Error('과제를 수정하려면 먼저 로그인해 주세요.'),
+      error: new Error('怨쇱젣瑜??섏젙?섎젮硫?癒쇱? 濡쒓렇?명빐 二쇱꽭??'),
     }
   }
 
@@ -353,12 +372,7 @@ export async function updateAssignmentWithAssets(assignmentId: string, input: As
     return { data: null as Assignment | null, error: removeError }
   }
 
-  const { error: uploadError } = await uploadAssets(
-    user.id,
-    assignmentId,
-    input.imageFiles,
-    input.attachmentFiles,
-  )
+  const { error: uploadError } = await uploadAssets(user.id, assignmentId, input.imageFiles, input.attachmentFiles)
 
   if (uploadError) {
     return { data: null as Assignment | null, error: uploadError }
@@ -406,9 +420,7 @@ export async function deleteAssignment(assignmentId: string) {
   const storagePaths = (assets ?? []).map((row) => String(row.storage_path ?? '')).filter(Boolean)
 
   if (storagePaths.length > 0) {
-    const { error: removeError } = await supabase.storage
-      .from(ASSIGNMENT_BUCKET)
-      .remove(storagePaths)
+    const { error: removeError } = await supabase.storage.from(ASSIGNMENT_BUCKET).remove(storagePaths)
 
     if (removeError) {
       return { error: removeError }
@@ -418,3 +430,4 @@ export async function deleteAssignment(assignmentId: string) {
   const { error } = await supabase.from('assignments').delete().eq('id', assignmentId)
   return { error }
 }
+

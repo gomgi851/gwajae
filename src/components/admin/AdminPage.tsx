@@ -78,6 +78,7 @@ export function AdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deletingUser, setDeletingUser] = useState<AllowedUser | null>(null)
 
   const currentEmail = user?.email?.toLowerCase() ?? ''
   const isSuperAdmin = currentEmail === SUPER_ADMIN_EMAIL
@@ -140,7 +141,7 @@ export function AdminPage() {
 
   async function toggleRole(entry: AllowedUser) {
     if (!isSuperAdmin) {
-      setError('권한 변경은 메인 관리자 계정에서만 할 수 있습니다.')
+      setError('권한 변경은 메인 관리자 계정에서만 가능합니다.')
       return
     }
 
@@ -190,19 +191,12 @@ export function AdminPage() {
 
   async function handleDelete(entry: AllowedUser) {
     if (!isSuperAdmin) {
-      setError('사용자 삭제는 메인 관리자 계정에서만 할 수 있습니다.')
+      setError('사용자 삭제는 메인 관리자 계정에서만 가능합니다.')
       return
     }
 
     if (entry.email === currentEmail) {
       setError('현재 로그인한 메인 관리자 계정은 삭제할 수 없습니다.')
-      return
-    }
-
-    const confirmed = window.confirm(
-      `${entry.email} 사용자를 완전히 삭제할까요?\n\n과제, 첨부 파일, 업로드된 스토리지 파일, 접근 권한이 모두 함께 삭제되며 되돌릴 수 없습니다.`,
-    )
-    if (!confirmed) {
       return
     }
 
@@ -217,6 +211,7 @@ export function AdminPage() {
       return
     }
 
+    setDeletingUser(null)
     setIsSaving(false)
     await loadAllowedUsers()
   }
@@ -269,7 +264,8 @@ export function AdminPage() {
           {error ? <p className={styles.errorText}>{error}</p> : null}
           {storageError ? (
             <p className={styles.helperText}>
-              사용자별 사용량은 첨부 파일 크기 기준입니다. 최신 정책이 반영되지 않았다면 0MB로 보일 수 있습니다.
+              사용자별 사용량은 첨부 파일 크기 합계 기준입니다. 최신 업로드가 바로 반영되지 않으면 잠시 뒤 다시
+              확인해 주세요.
             </p>
           ) : null}
           {isLoading ? <p className={styles.helperText}>허용 사용자 목록을 불러오는 중입니다...</p> : null}
@@ -329,7 +325,7 @@ export function AdminPage() {
                           <button
                             className={styles.deleteButton}
                             type="button"
-                            onClick={() => void handleDelete(entry)}
+                            onClick={() => setDeletingUser(entry)}
                             disabled={isSaving || entry.email === currentEmail}
                           >
                             삭제
@@ -344,6 +340,66 @@ export function AdminPage() {
           ) : null}
         </section>
       </main>
+
+      {deletingUser ? (
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => {
+            if (!isSaving) {
+              setDeletingUser(null)
+            }
+          }}
+        >
+          <section
+            className={styles.deleteModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.deleteModalHeader}>
+              <div>
+                <h2 id="delete-user-title" className={styles.deleteModalTitle}>
+                  사용자를 완전히 삭제할까요?
+                </h2>
+                <p className={styles.deleteModalDescription}>
+                  <strong>{deletingUser.email}</strong> 계정을 삭제하면 과제, 첨부 파일, 업로드한 저장
+                  공간 데이터, 허용 사용자 정보가 모두 사라지며 복구할 수 없습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.deleteModalClose}
+                onClick={() => setDeletingUser(null)}
+                disabled={isSaving}
+                aria-label="삭제 확인 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.deleteModalActions}>
+              <button
+                type="button"
+                className={styles.deleteModalCancel}
+                onClick={() => setDeletingUser(null)}
+                disabled={isSaving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.deleteModalConfirm}
+                onClick={() => void handleDelete(deletingUser)}
+                disabled={isSaving}
+              >
+                삭제하기
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

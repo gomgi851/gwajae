@@ -1,4 +1,4 @@
-create extension if not exists pgcrypto;
+﻿create extension if not exists pgcrypto;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -333,6 +333,12 @@ where not exists (
     and s.is_default = true
 );
 
+update public.subjects
+set
+  name = '미지정',
+  color = '#d7dee7'
+where is_default = true;
+
 create table if not exists public.assignments (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references auth.users(id) on delete cascade,
@@ -582,3 +588,5 @@ $$;
 grant execute on function public.get_admin_allowed_users_with_usage() to authenticated;
 grant execute on function public.sync_allowed_user_auth(text, uuid, text) to authenticated;
 grant execute on function public.purge_allowed_user(uuid) to authenticated;
+
+

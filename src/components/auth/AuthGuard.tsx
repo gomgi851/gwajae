@@ -46,7 +46,7 @@ export function UserGuard({ children }: PropsWithChildren) {
       <div className={styles.statePage}>
         <div className={styles.stateCard}>
           <h1>아직 접근이 허용되지 않았습니다.</h1>
-          <p>{accessMessage ?? '관리자에게 허용 이메일 목록에 추가해 달라고 요청해 주세요.'}</p>
+          <p>{accessMessage ?? '관리자에게 허용 이메일 목록 추가를 요청해 주세요.'}</p>
           <button className={styles.actionButton} onClick={() => void signOut()} type="button">
             로그아웃
           </button>
@@ -67,7 +67,7 @@ export function AdminGuard({ children }: PropsWithChildren) {
     return (
       <FullPageMessage
         title="Supabase 설정이 필요합니다."
-        description="관리자 공간을 열기 전에 Supabase 연결과 관리자 이메일 설정이 먼저 필요합니다."
+        description="관리자 공간에 들어가기 전에 Supabase 연결과 관리자 권한 설정이 먼저 필요합니다."
       />
     )
   }
@@ -89,7 +89,7 @@ export function AdminGuard({ children }: PropsWithChildren) {
     return (
       <FullPageMessage
         title="아직 접근이 허용되지 않았습니다."
-        description={accessMessage ?? '먼저 관리자에게 이메일 추가를 요청해 주세요.'}
+        description={accessMessage ?? '먼저 관리자에게 이메일 허용을 요청해 주세요.'}
       />
     )
   }
